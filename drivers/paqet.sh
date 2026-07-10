@@ -35,10 +35,22 @@ paqet_latest_version() {
     printf '%s' "${v:-$PAQET_DEFAULT_VERSION}"
 }
 
-# paqet_ensure_binary — download & install the Paqet binary if absent.
+# paqet_is_elf FILE — true if FILE begins with the ELF magic (0x7f 'E' 'L' 'F').
+# This is the reliable test for a real binary; filename/execute-bit are not.
+paqet_is_elf() {
+    local f="$1" magic
+    [[ -f "$f" ]] || return 1
+    magic="$(head -c4 "$f" 2>/dev/null | od -An -tx1 2>/dev/null | tr -d ' \n')"
+    [[ "$magic" == "7f454c46" ]]
+}
+
+# paqet_ensure_binary — download & install the Paqet binary if missing/invalid.
 paqet_ensure_binary() {
     local bin; bin="$(paqet_bin)"
-    [[ -x "$bin" ]] && return 0
+    # Accept an existing binary only if it is a genuine ELF; otherwise replace it.
+    if paqet_is_elf "$bin"; then return 0; fi
+    [[ -e "$bin" ]] && { log_warn "Existing $bin is not a valid ELF binary — replacing it."; rm -f "$bin"; }
+
     local arch; arch="$(paqet_arch)"
     [[ "$arch" == unsupported ]] && { log_error "unsupported CPU architecture: $(uname -m)"; return 1; }
 
@@ -55,17 +67,24 @@ paqet_ensure_binary() {
         log_error "Set PAQET_VERSION/PAQET_REPO in $TM_SETTINGS_FILE or place the binary at $bin manually."
         return 1
     fi
-    tar -xzf "$tmp/$asset" -C "$tmp" || { rm -rf "$tmp"; log_error "extract failed"; return 1; }
+    if ! tar -xzf "$tmp/$asset" -C "$tmp" 2>/dev/null; then
+        rm -rf "$tmp"; log_error "Archive is not a valid tar.gz (download may have returned an error page)."; return 1
+    fi
 
-    # Locate the extracted executable (name may vary between releases).
-    local found
-    found="$(find "$tmp" -type f \( -name 'paqet' -o -name 'paqet-*' -o -name 'paqet_*' \) | head -1)"
-    [[ -z "$found" ]] && found="$(find "$tmp" -type f -perm -u+x ! -name '*.tar.gz' | head -1)"
-    if [[ -z "$found" ]]; then rm -rf "$tmp"; log_error "no paqet binary inside archive"; return 1; fi
+    # Pick the first extracted file that is actually an ELF binary — robust to
+    # whatever the archive names it (paqet_linux_amd64, paqet, etc.).
+    local f found=""
+    while IFS= read -r f; do
+        if paqet_is_elf "$f"; then found="$f"; break; fi
+    done < <(find "$tmp" -type f | sort)
+    if [[ -z "$found" ]]; then
+        rm -rf "$tmp"; log_error "No ELF binary found inside the Paqet archive."; return 1
+    fi
 
     mkdir -p "$TM_BIN_DIR"
     install -m 0755 "$found" "$bin"
     rm -rf "$tmp"
+    if ! paqet_is_elf "$bin"; then log_error "Installed file failed ELF validation."; return 1; fi
     log_ok "Installed Paqet binary -> $bin"
 }
 
