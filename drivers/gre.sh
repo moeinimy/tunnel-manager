@@ -103,16 +103,17 @@ gre_preflight() {
 gre_up() {
     local dev="${TUN[IFNAME]}"
     gre_preflight
-    # Idempotent: recreate the link cleanly.
-    if ip link show "$dev" >/dev/null 2>&1; then
-        ip link del "$dev" 2>/dev/null || true
-    fi
-    local -a add=(ip link add "$dev" type gre local "${TUN[LOCAL_IP]}" remote "${TUN[REMOTE_IP]}" ttl "${TUN[TTL]:-255}")
+    # Idempotent: remove any prior tunnel/link with this name.
+    ip tunnel del "$dev" 2>/dev/null || ip link del "$dev" 2>/dev/null || true
+    # Use the classic `ip tunnel add ... mode gre` form. This is what the proven
+    # Iran tunnels (vatanhost, Azumi) use; the newer `ip link add type gre`
+    # produced tunnels that some Iran transit paths dropped on the return leg.
+    local -a add=(ip tunnel add "$dev" mode gre local "${TUN[LOCAL_IP]}" remote "${TUN[REMOTE_IP]}" ttl "${TUN[TTL]:-255}")
     [[ -n "${TUN[GRE_KEY]:-}" ]] && add+=(key "${TUN[GRE_KEY]}")
-    "${add[@]}" || { log_error "failed to create GRE link $dev"; return 1; }
-    ip addr add "${TUN[INNER_LOCAL]}/${TUN[INNER_CIDR]:-30}" dev "$dev"
-    ip link set "$dev" mtu "${TUN[MTU]}"
+    "${add[@]}" || { log_error "failed to create GRE tunnel $dev"; return 1; }
     ip link set "$dev" up
+    ip addr add "${TUN[INNER_LOCAL]}/${TUN[INNER_CIDR]:-30}" dev "$dev"
+    [[ -n "${TUN[MTU]:-}" ]] && ip link set "$dev" mtu "${TUN[MTU]}" 2>/dev/null || true
     gre_rules_up
     log_ok "GRE tunnel '${TUN[NAME]}' up on $dev (${TUN[INNER_LOCAL]} <-> ${TUN[INNER_REMOTE]})"
 }
@@ -121,7 +122,7 @@ gre_down() {
     local dev="${TUN[IFNAME]}"
     gre_rules_down
     ip link set "$dev" down 2>/dev/null || true
-    ip link del "$dev"  2>/dev/null || true
+    ip tunnel del "$dev" 2>/dev/null || ip link del "$dev" 2>/dev/null || true
     log_ok "GRE tunnel '${TUN[NAME]}' down"
 }
 

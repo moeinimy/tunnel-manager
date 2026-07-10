@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.5] - 2026-07-11
+
+### Changed
+- **GRE tunnels are now created with the classic `ip tunnel add ... mode gre`**
+  form instead of `ip link add ... type gre`. Both proven Iran tunnel tools
+  (vatanhost, Azumi 6TO4-GRE-IPIP-SIT) use the classic form; the newer form
+  produced tunnels whose return traffic was dropped on some Iran transit paths.
+  Teardown now uses `ip tunnel del` accordingly.
+
 ## [1.0.4] - 2026-07-11
 
 ### Fixed
