@@ -204,11 +204,16 @@ EOF
 # ---------------------------------------------------------------------------
 # Health, counters, status
 # ---------------------------------------------------------------------------
-# gre_health NAME — 0 if the interface exists and the peer answers.
+# gre_health NAME — 0 if the local tunnel interface exists and is UP.
+# We deliberately do NOT ping the peer here: a peer being unreachable does not
+# mean the local endpoint is broken, and restarting a healthy interface every
+# cycle just causes flapping. Peer reachability is tracked separately as
+# latency/loss metrics by the monitor.
 gre_health() {
-    local dev="${TUN[IFNAME]}"
+    local dev="${TUN[IFNAME]}" flags
     [[ -d "/sys/class/net/$dev" ]] || return 1
-    ping -c1 -W2 -I "$dev" "${TUN[INNER_REMOTE]}" >/dev/null 2>&1
+    flags="$(cat "/sys/class/net/$dev/flags" 2>/dev/null || echo 0x0)"
+    (( (flags & 0x1) != 0 ))   # IFF_UP
 }
 
 # gre_sample NAME — print "RX_BYTES TX_BYTES" from kernel interface counters.
