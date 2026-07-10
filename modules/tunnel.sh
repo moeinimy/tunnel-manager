@@ -70,7 +70,7 @@ tunnel_add() {
 # ---------------------------------------------------------------------------
 tunnel_remove() {
     require_root
-    local name="$1"
+    local name="${1:-}"
     [[ -n "$name" ]] || { pick_tunnel name || return 0; }
     tunnel_exists "$name" || { log_error "No such tunnel: $name"; return 1; }
     confirm "Really remove tunnel '$name'? This tears it down." no || return 0
@@ -92,7 +92,7 @@ tunnel_remove() {
 # ---------------------------------------------------------------------------
 tunnel_edit() {
     require_root
-    local name="$1"
+    local name="${1:-}"
     [[ -n "$name" ]] || { pick_tunnel name || return 0; }
     tunnel_exists "$name" || { log_error "No such tunnel: $name"; return 1; }
     load_tunnel "$name"
@@ -120,7 +120,7 @@ tunnel_edit() {
 # ---------------------------------------------------------------------------
 tunnel_start() {
     require_root
-    local name="$1"; [[ -n "$name" ]] || { pick_tunnel name || return 0; }
+    local name="${1:-}"; [[ -n "$name" ]] || { pick_tunnel name || return 0; }
     tunnel_exists "$name" || { log_error "No such tunnel: $name"; return 1; }
     log_info "Starting '$name'…"
     if svc_start "$name"; then
@@ -137,7 +137,7 @@ tunnel_start() {
 
 tunnel_stop() {
     require_root
-    local name="$1"; [[ -n "$name" ]] || { pick_tunnel name || return 0; }
+    local name="${1:-}"; [[ -n "$name" ]] || { pick_tunnel name || return 0; }
     tunnel_exists "$name" || { log_error "No such tunnel: $name"; return 1; }
     svc_stop "$name" || true
     state_set "$name" STATUS down
@@ -147,7 +147,7 @@ tunnel_stop() {
 
 tunnel_restart() {
     require_root
-    local name="$1"; [[ -n "$name" ]] || { pick_tunnel name || return 0; }
+    local name="${1:-}"; [[ -n "$name" ]] || { pick_tunnel name || return 0; }
     tunnel_exists "$name" || { log_error "No such tunnel: $name"; return 1; }
     if svc_restart "$name"; then
         state_set "$name" STATUS up
@@ -161,7 +161,7 @@ tunnel_restart() {
 
 tunnel_enable() {
     require_root
-    local name="$1"; [[ -n "$name" ]] || { pick_tunnel name || return 0; }
+    local name="${1:-}"; [[ -n "$name" ]] || { pick_tunnel name || return 0; }
     load_tunnel "$name" || { log_error "No such tunnel: $name"; return 1; }
     svc_enable "$name"; TUN[AUTOSTART]=yes; save_tunnel
     log_ok "Auto-start enabled for '$name'."
@@ -169,7 +169,7 @@ tunnel_enable() {
 
 tunnel_disable() {
     require_root
-    local name="$1"; [[ -n "$name" ]] || { pick_tunnel name || return 0; }
+    local name="${1:-}"; [[ -n "$name" ]] || { pick_tunnel name || return 0; }
     load_tunnel "$name" || { log_error "No such tunnel: $name"; return 1; }
     svc_disable "$name"; TUN[AUTOSTART]=no; save_tunnel
     log_ok "Auto-start disabled for '$name'."
@@ -179,14 +179,14 @@ tunnel_disable() {
 # Internal hooks called by systemd units
 # ---------------------------------------------------------------------------
 tunnel_up_hook() {   # __up NAME
-    local name="$1"
+    local name="${1:-}"
     load_tunnel "$name" || die "unknown tunnel: $name"
     driver_up
     state_set "$name" STATUS up
 }
 
 tunnel_down_hook() { # __down NAME
-    local name="$1"
+    local name="${1:-}"
     load_tunnel "$name" || return 0
     driver_down
     state_set "$name" STATUS down
@@ -196,7 +196,7 @@ tunnel_down_hook() { # __down NAME
 # Status / overview
 # ---------------------------------------------------------------------------
 tunnel_status() {
-    local name="$1"; [[ -n "$name" ]] || { pick_tunnel name || return 0; }
+    local name="${1:-}"; [[ -n "$name" ]] || { pick_tunnel name || return 0; }
     load_tunnel "$name" || { log_error "No such tunnel: $name"; return 1; }
     state_load "$name"
 
@@ -233,7 +233,7 @@ tunnel_overview() {
 
 # tunnel_logs NAME — recent journal for the tunnel's unit.
 tunnel_logs() {
-    local name="$1"; [[ -n "$name" ]] || { pick_tunnel name || return 0; }
+    local name="${1:-}"; [[ -n "$name" ]] || { pick_tunnel name || return 0; }
     tunnel_exists "$name" || { log_error "No such tunnel: $name"; return 1; }
     journalctl -u "$(unit_name "$name")" -n 40 --no-pager 2>/dev/null || \
         log_warn "journalctl unavailable."

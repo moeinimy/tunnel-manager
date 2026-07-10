@@ -39,7 +39,7 @@ backup_list() {
 # backup_restore FILE — restore config and re-install services.
 backup_restore() {
     require_root
-    local file="$1"
+    local file="${1:-}"
     [[ -n "$file" ]] || { pick_backup file || return 0; }
     [[ -f "$file" ]] || { log_error "Backup not found: $file"; return 1; }
     confirm "Restore from '$file'? Existing config will be overwritten." no || return 0
