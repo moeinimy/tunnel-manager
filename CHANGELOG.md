@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.4] - 2026-07-11
+
+### Fixed
+- **Paqet client firewall rules were one-directional (server-only).** NOTRACK
+  and RST-drop are now applied for both directions of the tunnel port, so the
+  client (Iran) side no longer has its raw packets mangled by conntrack/RST.
+- **Paqet binary validated by ELF magic** and self-healed if a previous run
+  installed a non-binary (fixes `Exec format error` / `status=203/EXEC`).
+- **Paqet config now matches the upstream schema exactly**: added `log.level`
+  and `network.tcp.local_flag`/`remote_flag`, matching hanselime/paqet examples.
+
+### Changed
+- **GRE now defaults to keyless.** Iran's border commonly drops keyed GRE while
+  passing plain GREv0; keys are only needed for multiple tunnels between the
+  same IP pair.
+- GRE health is based on interface UP state, not peer ping, to stop the monitor
+  from restart-flapping when the remote peer is temporarily unreachable.
+
 ## [1.0.1] - 2026-07-11
 
 ### Fixed

@@ -166,32 +166,14 @@ paqet_generate_config() {
     local file; file="$(paqet_cfg "${TUN[NAME]}")"
     mkdir -p "$TM_PAQET_DIR"
     local tmp; tmp="$(mktemp)"
+    # Schema matches the upstream examples (github.com/hanselime/paqet).
     {
         printf 'role: "%s"\n' "${TUN[PAQET_ROLE]}"
+        printf 'log:\n  level: "info"\n'
         if [[ "${TUN[PAQET_ROLE]}" == server ]]; then
             printf 'listen:\n  addr: ":%s"\n' "${TUN[PAQET_PORT]}"
         else
-            printf 'server:\n  addr: "%s:%s"\n' "${TUN[REMOTE_IP]}" "${TUN[PAQET_PORT]}"
-        fi
-        printf 'network:\n'
-        printf '  interface: "%s"\n' "${TUN[PAQET_IFACE]}"
-        printf '  ipv4:\n'
-        if [[ "${TUN[PAQET_ROLE]}" == server ]]; then
-            printf '    addr: "%s:%s"\n' "${TUN[LOCAL_IP]}" "${TUN[PAQET_PORT]}"
-        else
-            printf '    addr: "%s:0"\n' "${TUN[LOCAL_IP]}"
-        fi
-        printf '    router_mac: "%s"\n' "${TUN[PAQET_MAC]}"
-        printf 'transport:\n'
-        printf '  protocol: "kcp"\n'
-        printf '  conn: %s\n' "${TUN[PAQET_CONN]:-4}"
-        printf '  kcp:\n'
-        printf '    key: "%s"\n' "${TUN[PAQET_SECRET]}"
-        printf '    mode: "%s"\n' "${TUN[PAQET_MODE]:-fast}"
-        printf '    block: "%s"\n' "${TUN[PAQET_CIPHER]:-aes-128-gcm}"
-        printf '    mtu: %s\n' "${TUN[MTU]}"
-        # Client egress: SOCKS5 or explicit port forwards.
-        if [[ "${TUN[PAQET_ROLE]}" == client ]]; then
+            # Client egress declared near the top, like the upstream example.
             if [[ "${TUN[PAQET_TRAFFIC]}" == socks5 ]]; then
                 printf 'socks5:\n  - listen: "127.0.0.1:%s"\n' "${TUN[PAQET_SOCKS_PORT]}"
             elif [[ -n "${TUN[FORWARDS]:-}" ]]; then
@@ -205,6 +187,31 @@ paqet_generate_config() {
                 done
             fi
         fi
+        printf 'network:\n'
+        printf '  interface: "%s"\n' "${TUN[PAQET_IFACE]}"
+        printf '  ipv4:\n'
+        if [[ "${TUN[PAQET_ROLE]}" == server ]]; then
+            printf '    addr: "%s:%s"\n' "${TUN[LOCAL_IP]}" "${TUN[PAQET_PORT]}"
+        else
+            printf '    addr: "%s:0"\n' "${TUN[LOCAL_IP]}"
+        fi
+        printf '    router_mac: "%s"\n' "${TUN[PAQET_MAC]}"
+        # TCP flags used for packet crafting (matches upstream defaults/examples).
+        printf '  tcp:\n'
+        printf '    local_flag: ["PA"]\n'
+        [[ "${TUN[PAQET_ROLE]}" == client ]] && printf '    remote_flag: ["PA"]\n'
+        # Client needs the server address to connect to.
+        if [[ "${TUN[PAQET_ROLE]}" == client ]]; then
+            printf 'server:\n  addr: "%s:%s"\n' "${TUN[REMOTE_IP]}" "${TUN[PAQET_PORT]}"
+        fi
+        printf 'transport:\n'
+        printf '  protocol: "kcp"\n'
+        printf '  conn: %s\n' "${TUN[PAQET_CONN]:-4}"
+        printf '  kcp:\n'
+        printf '    key: "%s"\n' "${TUN[PAQET_SECRET]}"
+        printf '    mode: "%s"\n' "${TUN[PAQET_MODE]:-fast}"
+        printf '    block: "%s"\n' "${TUN[PAQET_CIPHER]:-aes-128-gcm}"
+        printf '    mtu: %s\n' "${TUN[MTU]}"
     } >"$tmp"
     chmod 600 "$tmp"
     mv -f "$tmp" "$file"
@@ -226,18 +233,27 @@ paqet_down() {
     log_ok "Paqet '${TUN[NAME]}' rules removed"
 }
 
-paqet_rules_up() {
-    local port="${TUN[PAQET_PORT]}"
-    _ipt_ensure raw    PREROUTING -p tcp --dport "$port" -j NOTRACK
-    _ipt_ensure raw    OUTPUT     -p tcp --sport "$port" -j NOTRACK
-    _ipt_ensure mangle OUTPUT     -p tcp --sport "$port" --tcp-flags RST RST -j DROP
-}
+# Paqet crafts/receives raw TCP on the tunnel port. We must stop the kernel's
+# conntrack and RST generation from interfering. A server sees the port as its
+# dport (in) / sport (out); a client sees it as its dport (out) / sport (in).
+# We therefore apply the full both-directions set, scoped to the port, so the
+# same rules are correct for either role.
+paqet_rules_up()   { paqet_rules apply; }
+paqet_rules_down() { paqet_rules remove; }
 
-paqet_rules_down() {
-    local port="${TUN[PAQET_PORT]}"
-    _ipt_remove raw    PREROUTING -p tcp --dport "$port" -j NOTRACK
-    _ipt_remove raw    OUTPUT     -p tcp --sport "$port" -j NOTRACK
-    _ipt_remove mangle OUTPUT     -p tcp --sport "$port" --tcp-flags RST RST -j DROP
+paqet_rules() {
+    local action="$1" port="${TUN[PAQET_PORT]}"
+    local fn=_ipt_ensure; [[ "$action" == remove ]] && fn=_ipt_remove
+    # NOTRACK the port in both chains and both directions.
+    "$fn" raw PREROUTING -p tcp --dport "$port" -j NOTRACK
+    "$fn" raw PREROUTING -p tcp --sport "$port" -j NOTRACK
+    "$fn" raw OUTPUT     -p tcp --dport "$port" -j NOTRACK
+    "$fn" raw OUTPUT     -p tcp --sport "$port" -j NOTRACK
+    # Drop kernel-generated RSTs touching the port (both directions).
+    "$fn" mangle OUTPUT     -p tcp --sport "$port" --tcp-flags RST RST -j DROP
+    "$fn" mangle OUTPUT     -p tcp --dport "$port" --tcp-flags RST RST -j DROP
+    "$fn" mangle PREROUTING -p tcp --sport "$port" --tcp-flags RST RST -j DROP
+    "$fn" mangle PREROUTING -p tcp --dport "$port" --tcp-flags RST RST -j DROP
 }
 
 # ---------------------------------------------------------------------------

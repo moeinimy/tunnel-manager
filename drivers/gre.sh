@@ -35,10 +35,12 @@ gre_wizard() {
         TUN[INNER_REMOTE]="$(ipam_addr "$idx" iran)"
     fi
 
-    # A GRE key lets multiple tunnels share the same endpoint pair; default to
-    # the IPAM index so it is unique and stable.
+    # A GRE key allows multiple tunnels between the SAME endpoint pair, but many
+    # ISPs (notably Iran's border) drop keyed GRE while passing plain GREv0.
+    # Default is therefore keyless; only enable a key if you truly need several
+    # tunnels between the same two public IPs.
     local usekey
-    ask usekey "Use a GRE key (recommended)? [Y/n]" "Y"
+    ask usekey "Use a GRE key? Only for multiple tunnels between the same IP pair [y/N]" "N"
     if [[ "$usekey" =~ ^([yY]|[yY][eE][sS])$ ]]; then
         ask_valid TUN[GRE_KEY] "GRE key (integer)" is_uint "$(( 1000 + idx ))"
     else
