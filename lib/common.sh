@@ -25,7 +25,7 @@
 TM_UNIT_PREFIX="tm-tunnel-"
 
 # GitHub repository used for self-update (owner/name). Override in settings.conf.
-: "${TM_REPO:=YOURUSER/tunnel-manager}"
+: "${TM_REPO:=moeinimy/tunnel-manager}"
 
 # ---------------------------------------------------------------------------
 # Colors (disabled automatically when output is not a TTY or NO_COLOR is set)

@@ -37,22 +37,22 @@ Ubuntu 20.04+ / Debian 11+ (tested target: **Ubuntu 24.04**). Run as root.
 
 **From a clone (recommended):**
 ```bash
-git clone https://github.com/YOURUSER/tunnel-manager.git
+git clone https://github.com/moeinimy/tunnel-manager.git
 cd tunnel-manager
 sudo bash install.sh
 ```
 
 **One-liner** (after you push the repo and set the URL):
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/YOURUSER/tunnel-manager/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/moeinimy/tunnel-manager/main/install.sh)
 ```
 
-Then edit `/etc/tunnel-manager/settings.conf` and set `TM_REPO=YOURUSER/tunnel-manager`
+Then edit `/etc/tunnel-manager/settings.conf` and set `TM_REPO=moeinimy/tunnel-manager`
 so updates work.
 
 ### 🇮🇷 شروع سریع (فارسی)
 ```bash
-git clone https://github.com/YOURUSER/tunnel-manager.git
+git clone https://github.com/moeinimy/tunnel-manager.git
 cd tunnel-manager && sudo bash install.sh
 sudo tunnelctl                 # باز کردن منوی مدیریت
 ```

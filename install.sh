@@ -18,7 +18,7 @@ _src="${BASH_SOURCE[0]}"
 SRC_DIR="$(cd -P "$(dirname "$_src")" >/dev/null 2>&1 && pwd)"
 
 if [[ ! -f "$SRC_DIR/tunnelctl" ]]; then
-    : "${TM_REPO:=YOURUSER/tunnel-manager}"
+    : "${TM_REPO:=moeinimy/tunnel-manager}"
     : "${TM_BRANCH:=main}"
     echo "Fetching Tunnel Manager source from $TM_REPO ($TM_BRANCH)…"
     _tmp="$(mktemp -d)"
@@ -80,7 +80,7 @@ ensure_dirs
 if [[ ! -f "$TM_SETTINGS_FILE" ]]; then
     cat >"$TM_SETTINGS_FILE" <<EOF
 # Tunnel Manager settings — edit and restart services to apply.
-TM_REPO=${TM_REPO:-YOURUSER/tunnel-manager}
+TM_REPO=${TM_REPO:-moeinimy/tunnel-manager}
 TM_BRANCH=main
 
 # Paqet binary source (see docs if downloads fail)
