@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-07-11
+
+### Added
+- **Backhaul transport driver (3rd protocol).** Musixal/Backhaul — a fast
+  Iranian reverse tunnel for NAT/firewall traversal with tcp/tcpmux/ws/wsmux
+  transports and multiplexing. Selectable per-tunnel like GRE/Paqet: auto binary
+  download, TOML config generation, systemd service. Server side owns the public
+  ports + forwarding map; client dials out.
+
+## [1.3.1] - 2026-07-11
+
+### Added
+- **Persistent Telegram keyboard** under the chat input + `/` command menu
+  (no `/start` needed each time).
+### Fixed
+- Updates now restart `tm-monitor`/`tm-bot` so new code (traffic accounting, bot
+  UI) takes effect immediately — fixes usage showing all zeros after an update.
+
 ## [1.3.0] - 2026-07-11
 
 ### Added

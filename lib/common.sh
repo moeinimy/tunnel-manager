@@ -12,6 +12,7 @@
 : "${TM_LOG_DIR:=/var/log/tunnel-manager}"
 : "${TM_TUNNELS_DIR:=$TM_CONFIG_DIR/tunnels}"
 : "${TM_PAQET_DIR:=$TM_CONFIG_DIR/paqet}"
+: "${TM_BACKHAUL_DIR:=$TM_CONFIG_DIR/backhaul}"
 : "${TM_STATE_TUNNELS:=$TM_STATE_DIR/state}"
 : "${TM_BACKUP_DIR:=$TM_STATE_DIR/backups}"
 : "${TM_BIN_DIR:=$TM_HOME/bin}"
@@ -107,7 +108,7 @@ confirm() {
 # ensure_dirs — create the runtime directory tree with sane permissions.
 ensure_dirs() {
     local d
-    for d in "$TM_CONFIG_DIR" "$TM_TUNNELS_DIR" "$TM_PAQET_DIR" \
+    for d in "$TM_CONFIG_DIR" "$TM_TUNNELS_DIR" "$TM_PAQET_DIR" "$TM_BACKHAUL_DIR" \
              "$TM_STATE_DIR" "$TM_STATE_TUNNELS" "$TM_BACKUP_DIR" "$TM_LOG_DIR"; do
         mkdir -p "$d" 2>/dev/null || true
     done
@@ -174,4 +175,22 @@ detect_gateway_mac() {
 gen_secret() {
     local len="${1:-32}"
     LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$len"
+}
+
+# is_elf FILE — true if FILE begins with the ELF magic (a real binary).
+is_elf() {
+    local f="$1" magic
+    [[ -f "$f" ]] || return 1
+    magic="$(head -c4 "$f" 2>/dev/null | od -An -tx1 2>/dev/null | tr -d ' \n')"
+    [[ "$magic" == "7f454c46" ]]
+}
+
+# cpu_arch — normalised architecture: amd64|arm64|arm32|unsupported
+cpu_arch() {
+    case "$(uname -m)" in
+        x86_64|amd64)       echo amd64 ;;
+        aarch64|arm64)      echo arm64 ;;
+        armv7l|armv7|armhf) echo arm32 ;;
+        *)                  echo unsupported ;;
+    esac
 }

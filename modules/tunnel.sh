@@ -27,7 +27,7 @@ tunnel_add() {
         break
     done
 
-    ask_menu proto "Protocol" gre paqet
+    ask_menu proto "Protocol" gre paqet backhaul
     ask_menu role  "Role of THIS server" iran foreign
 
     # Initialise a fresh profile.
@@ -80,6 +80,7 @@ tunnel_remove() {
     # Best-effort teardown in case the service was not running.
     driver_down 2>/dev/null || true
     [[ "${TUN[PROTOCOL]}" == paqet ]] && rm -f "$(paqet_cfg "$name")"
+    [[ "${TUN[PROTOCOL]}" == backhaul ]] && rm -f "$(backhaul_cfg "$name")"
     [[ -n "${TUN[IPAM_INDEX]:-}" ]] && ipam_free "$name"
     state_delete "$name"
     rm -f "$TM_STATE_DIR/history/${name}.hist"
