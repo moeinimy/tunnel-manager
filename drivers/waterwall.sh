@@ -115,6 +115,14 @@ ww_generate_config() {
     mkdir -p "$dir/log"
     printf '{ "configs": ["config.json"] }\n' >"$dir/core.json"
     local cfg="$dir/config.json" tmp; tmp="$(mktemp)"
+    # Bring-your-own graph: if you drop a hand-crafted WaterWall config at
+    # <dir>/custom.json (e.g. a Reality/encryption profile), it is used verbatim
+    # and the built-in simple-tunnel generator is skipped.
+    if [[ -f "$dir/custom.json" ]]; then
+        install -m 600 "$dir/custom.json" "$cfg"
+        log_info "WaterWall '${TUN[NAME]}' using custom.json"
+        rm -f "$tmp"; return 0
+    fi
 
     # Build the listener + optional obfuscator + connector chain.
     local in_addr in_port out_addr out_port name obf_type in_next="out" obf_node=""
