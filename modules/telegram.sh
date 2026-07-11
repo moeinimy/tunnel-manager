@@ -37,6 +37,22 @@ tg_send_kb() {
         "${TG_API}/bot${TG_BOT_TOKEN}/sendMessage" >/dev/null 2>&1
 }
 
+# tg_set_commands — register the "/" command menu (shows next to the input box).
+tg_set_commands() {
+    [[ -n "${TG_BOT_TOKEN:-}" ]] || return 1
+    curl -fsS --max-time 15 --data-urlencode \
+        'commands=[{"command":"menu","description":"Open the button menu"},{"command":"status","description":"Tunnels status"},{"command":"bandwidth","description":"Live bandwidth"},{"command":"usage","description":"Traffic usage by period"},{"command":"system","description":"Server system info"},{"command":"peers","description":"Other servers"},{"command":"report","description":"Daily report"}]' \
+        "${TG_API}/bot${TG_BOT_TOKEN}/setMyCommands" >/dev/null 2>&1
+    # The "Menu" button next to the chat opens the command list (no /start needed).
+    curl -fsS --max-time 15 --data-urlencode 'menu_button={"type":"commands"}' \
+        "${TG_API}/bot${TG_BOT_TOKEN}/setChatMenuButton" >/dev/null 2>&1
+}
+
+# tg_reply_kb — a persistent keyboard that stays under the chat input box.
+tg_reply_kb() {
+    printf '%s' '{"keyboard":[["📊 Status","📈 Bandwidth"],["📅 Usage","🖥 System"],["🚇 Tunnels","🌐 Peers"]],"resize_keyboard":true,"is_persistent":true}'
+}
+
 # tg_answer_callback ID [TEXT] — acknowledge a button tap (stops the spinner).
 tg_answer_callback() {
     local cid="$1" text="${2:-}"
@@ -76,7 +92,10 @@ EOF
     tg_load
     if tg_send "✅ <b>Tunnel Manager</b> connected on $(hostname)."; then
         log_ok "Telegram configured and test message sent."
-        tg_send_kb "Tap a button to begin:" "$(tg_kb_main)" >/dev/null 2>&1 || true
+        tg_set_commands
+        # Persistent keyboard under the input box + inline menu.
+        tg_send_kb "Quick buttons are ready 👇" "$(tg_reply_kb)" >/dev/null 2>&1 || true
+        tg_send_kb "Or use the full menu:" "$(tg_kb_main)" >/dev/null 2>&1 || true
         systemctl enable --now tm-bot.service >/dev/null 2>&1 || \
             log_warn "Could not start tm-bot.service (is it installed?)."
     else
@@ -126,6 +145,7 @@ tg_kb_peers() {
 tg_bot_run() {
     tg_enabled || { log_warn "Telegram not configured; bot exiting."; return 0; }
     log_info "Telegram bot started."
+    tg_set_commands || true
     local offset=0 resp n i chat text cb_id cb_chat cb_data
     while true; do
         resp="$(curl -fsS --max-time 60 \
@@ -155,6 +175,15 @@ tg_bot_run() {
 # tg_command "TEXT" CHAT — map a typed command to an action.
 tg_command() {
     local line="$1" chat="$2" cmd arg
+    # Persistent reply-keyboard buttons arrive as plain text — map them first.
+    case "$line" in
+        "📊 Status")    tg_action status "$chat";    return ;;
+        "📈 Bandwidth") tg_action bandwidth "$chat"; return ;;
+        "📅 Usage")     tg_action usage "$chat";     return ;;
+        "🖥 System")    tg_action system "$chat";    return ;;
+        "🚇 Tunnels")   tg_action tunnels "$chat";   return ;;
+        "🌐 Peers")     tg_action peers "$chat";     return ;;
+    esac
     cmd="${line%% *}"; cmd="${cmd%%@*}"
     arg="${line#"$cmd"}"; arg="${arg# }"
     case "$cmd" in

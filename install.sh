@@ -115,6 +115,11 @@ systemctl enable --now tm-report.timer   >/dev/null 2>&1 || log_warn "Could not 
 # Peer control agent (zero-config multi-server over the tunnel).
 systemctl enable --now tm-agent.socket   >/dev/null 2>&1 || log_warn "Could not enable tm-agent.socket."
 agent_firewall ensure 2>/dev/null || true
+
+# Restart long-running services so updated code (monitor accounting, bot UI)
+# takes effect immediately. try-restart only acts if the unit is running.
+systemctl try-restart tm-monitor.service >/dev/null 2>&1 || true
+systemctl try-restart tm-bot.service     >/dev/null 2>&1 || true
 # Start the bot only if Telegram is already configured.
 if [[ -f "$TM_TELEGRAM_FILE" ]] && grep -q '^TG_ENABLED=yes' "$TM_TELEGRAM_FILE" 2>/dev/null; then
     systemctl enable --now tm-bot.service >/dev/null 2>&1 || true
