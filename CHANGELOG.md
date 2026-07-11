@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.9.0] - 2026-07-11
+
+### Changed
+- **WaterWall now uses real encryption (`EncryptionClient/Server`,
+  chacha20-poly1305) instead of the XOR obfuscator.** The XOR obfuscator dropped
+  connections and plain transparent links get DPI-throttled; a proper encrypted
+  link (shared password) masks the tunnel and forwards reliably — the WaterWall
+  equivalent of GOST's mtls. Encryption is on by default (password prompted).
+
 ## [1.8.3] - 2026-07-11
 
 ### Changed

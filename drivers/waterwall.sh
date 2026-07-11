@@ -77,13 +77,16 @@ waterwall_wizard() {
     TUN[WW_ROLE]="$role"
 
     ask_valid TUN[WW_PORT] "Tunnel port (server listens / client connects)" is_port 8443
-    # Obfuscation is OFF by default: xray/VLESS-Reality already camouflages itself,
-    # so a transparent tunnel is the reliable choice. Enable XOR only for carrying
-    # non-camouflaged (plain) traffic.
-    TUN[WW_OBFUSCATE]=no; TUN[WW_KEY]=0
-    if confirm "Add XOR obfuscation? (leave OFF for xray/Reality — it self-camouflages)" no; then
-        TUN[WW_OBFUSCATE]=yes
-        ask_valid TUN[WW_KEY] "Obfuscation XOR key 1-255 (MUST match the other side)" _ww_is_key "$(( (RANDOM % 254) + 1 ))"
+    # Real encryption (chacha20-poly1305) is ON by default: it masks the tunnel
+    # link from DPI and forwards reliably (like GOST mtls). Turn it off only for a
+    # plain transparent tunnel riding on another encrypted path.
+    TUN[WW_ENCRYPT]=yes
+    if confirm "Encrypt the tunnel link? (recommended)" yes; then
+        TUN[WW_ENCRYPT]=yes
+        ask TUN[WW_PASSWORD] "Encryption password (blank = auto; MUST match the other side)" ""
+        [[ -n "${TUN[WW_PASSWORD]}" ]] || TUN[WW_PASSWORD]="$(gen_secret 24)"
+    else
+        TUN[WW_ENCRYPT]=no
     fi
 
     if [[ "$role" == client ]]; then
@@ -98,8 +101,8 @@ _ww_is_key() { [[ "$1" =~ ^[0-9]+$ ]] && (( $1 >= 1 && $1 <= 255 )); }
 
 waterwall_validate() {
     is_port "${TUN[WW_PORT]:-}" || { log_error "invalid tunnel port"; return 1; }
-    if [[ "${TUN[WW_OBFUSCATE]:-no}" == yes ]]; then
-        _ww_is_key "${TUN[WW_KEY]:-}" || { log_error "XOR key must be 1-255"; return 1; }
+    if [[ "${TUN[WW_ENCRYPT]:-yes}" == yes ]]; then
+        [[ -n "${TUN[WW_PASSWORD]:-}" ]] || { log_error "encryption password required"; return 1; }
     fi
     if [[ "${TUN[WW_ROLE]}" == client ]]; then
         is_ipv4 "${TUN[REMOTE_IP]:-}" || { log_error "invalid server IP"; return 1; }
@@ -124,20 +127,20 @@ ww_generate_config() {
         rm -f "$tmp"; return 0
     fi
 
-    # Build the listener + optional obfuscator + connector chain.
-    local in_addr in_port out_addr out_port name obf_type in_next="out" obf_node=""
+    # Build the listener + optional encryption + connector chain.
+    local in_addr in_port out_addr out_port name enc_type in_next="out" enc_node=""
     if [[ "${TUN[WW_ROLE]}" == client ]]; then
-        name="${TUN[NAME]}-client"; obf_type="ObfuscatorClient"
+        name="${TUN[NAME]}-client"; enc_type="EncryptionClient"
         in_addr="0.0.0.0";   in_port="${TUN[WW_USER_PORT]}"
         out_addr="${TUN[REMOTE_IP]}"; out_port="${TUN[WW_PORT]}"
     else
-        name="${TUN[NAME]}-server"; obf_type="ObfuscatorServer"
+        name="${TUN[NAME]}-server"; enc_type="EncryptionServer"
         in_addr="0.0.0.0";   in_port="${TUN[WW_PORT]}"
         out_addr="127.0.0.1"; out_port="${TUN[WW_TARGET_PORT]}"
     fi
-    if [[ "${TUN[WW_OBFUSCATE]:-no}" == yes ]]; then
-        in_next="obf"
-        obf_node="    { \"name\": \"obf\", \"type\": \"${obf_type}\", \"settings\": { \"method\": \"xor\", \"xor_key\": ${TUN[WW_KEY]}, \"skip\": \"none\", \"tls_record_header\": false }, \"next\": \"out\" },
+    if [[ "${TUN[WW_ENCRYPT]:-yes}" == yes ]]; then
+        in_next="enc"
+        enc_node="    { \"name\": \"enc\", \"type\": \"${enc_type}\", \"settings\": { \"algorithm\": \"chacha20-poly1305\", \"password\": \"${TUN[WW_PASSWORD]}\", \"salt\": \"tm-${TUN[NAME]}\" }, \"next\": \"out\" },
 "
     fi
     cat >"$tmp" <<EOF
@@ -145,7 +148,7 @@ ww_generate_config() {
   "name": "${name}",
   "nodes": [
     { "name": "in",  "type": "TcpListener",  "settings": { "address": "${in_addr}", "port": ${in_port}, "nodelay": true }, "next": "${in_next}" },
-${obf_node}    { "name": "out", "type": "TcpConnector", "settings": { "address": "${out_addr}", "port": ${out_port}, "nodelay": true } }
+${enc_node}    { "name": "out", "type": "TcpConnector", "settings": { "address": "${out_addr}", "port": ${out_port}, "nodelay": true } }
   ]
 }
 EOF
@@ -191,7 +194,7 @@ waterwall_sample() { printf '0 0'; }
 
 waterwall_status() {
     ui_kv "Role"      "${TUN[WW_ROLE]}"
-    if [[ "${TUN[WW_OBFUSCATE]:-no}" == yes ]]; then ui_kv "Obfuscator" "xor key=${TUN[WW_KEY]}"; else ui_kv "Obfuscator" "off (transparent)"; fi
+    if [[ "${TUN[WW_ENCRYPT]:-yes}" == yes ]]; then ui_kv "Encryption" "chacha20-poly1305"; else ui_kv "Encryption" "off (transparent)"; fi
     if [[ "${TUN[WW_ROLE]}" == client ]]; then
         ui_kv "Listen"  "0.0.0.0:${TUN[WW_USER_PORT]} → ${TUN[REMOTE_IP]}:${TUN[WW_PORT]}"
     else
