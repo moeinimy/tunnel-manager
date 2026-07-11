@@ -62,7 +62,12 @@ gost_wizard() {
         "$def_role" "$([[ "$def_role" == server ]] && echo client || echo server)"
     TUN[GO_ROLE]="$role"
 
-    ask_menu TUN[GO_PROTO] "Relay transport (wss/mwss are stealthier; tcp is simplest)" wss mwss grpc tcp
+    # mtls/mwss keep a persistent multiplexed, TLS-wrapped connection — low
+    # latency and DPI-resistant (looks like HTTPS). Plain tcp opens a fresh
+    # unencrypted connection per request, which Iran's DPI throttles/resets and
+    # which breaks latency-sensitive handshakes like xray Reality. Default: mtls.
+    ask_menu TUN[GO_PROTO] "Relay transport (mtls/mwss recommended for xray; tcp only for plain TCP)" \
+        mtls mwss grpc wss tcp
     ask_valid TUN[GO_PORT] "Relay port" is_port 8443
     TUN[GO_USER]="tm"
     ask TUN[GO_PASS] "Relay password (blank = auto; MUST match the other side)" ""

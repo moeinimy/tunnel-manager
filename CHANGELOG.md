@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.6.1] - 2026-07-11
+
+### Changed
+- **GOST default transport is now `mtls`** (multiplexed TLS) instead of `tcp`.
+  Plain `relay+tcp` opens a fresh unencrypted connection per request, which
+  Iran's DPI throttles/resets and which breaks latency-sensitive handshakes
+  (e.g. xray Reality — seen as ~10s stalls with no response). `mtls`/`mwss` keep
+  a persistent multiplexed, HTTPS-looking connection like Backhaul/Rathole do.
+
 ## [1.6.0] - 2026-07-11
 
 ### Added
