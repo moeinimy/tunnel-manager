@@ -27,7 +27,7 @@ tunnel_add() {
         break
     done
 
-    ask_menu proto "Protocol" gre paqet backhaul rathole
+    ask_menu proto "Protocol" gre paqet backhaul rathole gost
     ask_menu role  "Role of THIS server" iran foreign
 
     # Initialise a fresh profile.
@@ -82,6 +82,7 @@ tunnel_remove() {
     [[ "${TUN[PROTOCOL]}" == paqet ]] && rm -f "$(paqet_cfg "$name")"
     [[ "${TUN[PROTOCOL]}" == backhaul ]] && rm -f "$(backhaul_cfg "$name")"
     [[ "${TUN[PROTOCOL]}" == rathole ]] && rm -f "$(rathole_cfg "$name")"
+    [[ "${TUN[PROTOCOL]}" == gost ]] && rm -f "$(gost_wrapper "$name")"
     [[ -n "${TUN[IPAM_INDEX]:-}" ]] && ipam_free "$name"
     state_delete "$name"
     rm -f "$TM_STATE_DIR/history/${name}.hist"

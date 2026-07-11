@@ -27,6 +27,8 @@ if [[ -f "$INSTALL_DIR/lib/common.sh" ]]; then
     # shellcheck source=/dev/null
     . "$INSTALL_DIR/drivers/rathole.sh"
     # shellcheck source=/dev/null
+    . "$INSTALL_DIR/drivers/gost.sh"
+    # shellcheck source=/dev/null
     . "$INSTALL_DIR/lib/ipam.sh"
 else
     echo "Tunnel Manager does not appear to be installed at $INSTALL_DIR."

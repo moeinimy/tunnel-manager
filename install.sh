@@ -71,7 +71,7 @@ ln -sf "$INSTALL_DIR/tunnelctl" "$BIN_LINK"
 TM_HOME="$INSTALL_DIR"; export TM_HOME
 for _lib in lib/common.sh lib/validate.sh lib/config.sh lib/ipam.sh \
             lib/systemd.sh drivers/driver.sh drivers/gre.sh drivers/paqet.sh \
-            drivers/backhaul.sh drivers/rathole.sh modules/peer.sh; do
+            drivers/backhaul.sh drivers/rathole.sh drivers/gost.sh modules/peer.sh; do
     # shellcheck source=/dev/null
     . "$INSTALL_DIR/$_lib"
 done

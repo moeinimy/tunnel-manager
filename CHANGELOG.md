@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.6.0] - 2026-07-11
+
+### Added
+- **GOST v3 relay driver (5th protocol).** go-gost/gost — a versatile relay with
+  tcp/wss/mwss/grpc transports. Iran side listens locally and forwards ports
+  through a relay chain to the foreign side (Iran→foreign). Auto binary download;
+  the relay command (with credentials) is rendered into a `0700` wrapper script
+  so secrets stay out of the world-readable unit file.
+
 ## [1.5.0] - 2026-07-11
 
 ### Added
