@@ -141,7 +141,7 @@ ww_generate_config() {
     fi
     if [[ "${TUN[WW_ENCRYPT]:-yes}" == yes ]]; then
         in_next="enc"
-        enc_node="    { \"name\": \"enc\", \"type\": \"${enc_type}\", \"settings\": { \"algorithm\": \"chacha20-poly1305\", \"password\": \"${TUN[WW_PASSWORD]}\", \"salt\": \"tm-${TUN[NAME]}\" }, \"next\": \"out\" },
+        enc_node="    { \"name\": \"enc\", \"type\": \"${enc_type}\", \"settings\": { \"algorithm\": \"chacha20-poly1305\", \"password\": \"${TUN[WW_PASSWORD]}\", \"salt\": \"tm-${TUN[NAME]}\", \"kdf-iterations\": 12000 }, \"next\": \"out\" },
 "
     fi
     cat >"$tmp" <<EOF
