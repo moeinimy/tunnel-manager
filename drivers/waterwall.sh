@@ -116,7 +116,8 @@ waterwall_validate() {
 ww_generate_config() {
     local dir; dir="$(ww_dir "${TUN[NAME]}")"
     mkdir -p "$dir/log"
-    printf '{ "configs": ["config.json"] }\n' >"$dir/core.json"
+    # Network logging at DEBUG so per-connection flow/errors are visible.
+    printf '{ "log": { "path": "log/", "core": {"loglevel":"INFO","file":"core.log"}, "network": {"loglevel":"DEBUG","file":"network.log"}, "internal": {"loglevel":"INFO","file":"internal.log"} }, "configs": ["config.json"] }\n' >"$dir/core.json"
     local cfg="$dir/config.json" tmp; tmp="$(mktemp)"
     # Bring-your-own graph: if you drop a hand-crafted WaterWall config at
     # <dir>/custom.json (e.g. a Reality/encryption profile), it is used verbatim
