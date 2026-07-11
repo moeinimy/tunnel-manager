@@ -58,11 +58,18 @@ if [[ -f "$INSTALL_DIR/modules/optimize.sh" ]]; then
 fi
 
 # --- Stop and remove infra services ----------------------------------------
-for u in tm-monitor.service tm-bot.service tm-report.service tm-report.timer; do
+for u in tm-monitor.service tm-bot.service tm-report.service tm-report.timer \
+         tm-agent.socket tm-agent@.service; do
     systemctl disable --now "$u" >/dev/null 2>&1 || true
     rm -f "/etc/systemd/system/$u"
 done
 systemctl daemon-reload 2>/dev/null || true
+# Remove the agent firewall rules if the helper is available.
+if [[ -f "$INSTALL_DIR/modules/peer.sh" ]]; then
+    # shellcheck source=/dev/null
+    . "$INSTALL_DIR/modules/peer.sh" 2>/dev/null || true
+    agent_firewall remove 2>/dev/null || true
+fi
 
 # --- Remove files -----------------------------------------------------------
 rm -f "$BIN_LINK"

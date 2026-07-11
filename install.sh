@@ -70,7 +70,8 @@ ln -sf "$INSTALL_DIR/tunnelctl" "$BIN_LINK"
 # the update-mode re-install loop below.
 TM_HOME="$INSTALL_DIR"; export TM_HOME
 for _lib in lib/common.sh lib/validate.sh lib/config.sh lib/ipam.sh \
-            lib/systemd.sh drivers/driver.sh drivers/gre.sh drivers/paqet.sh; do
+            lib/systemd.sh drivers/driver.sh drivers/gre.sh drivers/paqet.sh \
+            modules/peer.sh; do
     # shellcheck source=/dev/null
     . "$INSTALL_DIR/$_lib"
 done
@@ -106,9 +107,14 @@ install -m 0644 "$INSTALL_DIR/systemd/tm-monitor.service" /etc/systemd/system/tm
 install -m 0644 "$INSTALL_DIR/systemd/tm-bot.service"     /etc/systemd/system/tm-bot.service
 install -m 0644 "$INSTALL_DIR/systemd/tm-report.service"  /etc/systemd/system/tm-report.service
 install -m 0644 "$INSTALL_DIR/systemd/tm-report.timer"    /etc/systemd/system/tm-report.timer
+install -m 0644 "$INSTALL_DIR/systemd/tm-agent.socket"    /etc/systemd/system/tm-agent.socket
+install -m 0644 "$INSTALL_DIR/systemd/tm-agent@.service"  /etc/systemd/system/tm-agent@.service
 systemctl daemon-reload
 systemctl enable --now tm-monitor.service >/dev/null 2>&1 || log_warn "Could not start tm-monitor."
 systemctl enable --now tm-report.timer   >/dev/null 2>&1 || log_warn "Could not enable tm-report.timer."
+# Peer control agent (zero-config multi-server over the tunnel).
+systemctl enable --now tm-agent.socket   >/dev/null 2>&1 || log_warn "Could not enable tm-agent.socket."
+agent_firewall ensure 2>/dev/null || true
 # Start the bot only if Telegram is already configured.
 if [[ -f "$TM_TELEGRAM_FILE" ]] && grep -q '^TG_ENABLED=yes' "$TM_TELEGRAM_FILE" 2>/dev/null; then
     systemctl enable --now tm-bot.service >/dev/null 2>&1 || true

@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-07-11
+
+### Added
+- **Zero-config multi-server control.** Every server now runs a tiny peer agent
+  (systemd socket + handler) that answers a small allowlist of commands
+  (`list/status/bandwidth/report/logs/restart`) — but ONLY for requests arriving
+  over a tunnel interface from the connected peer's inner IP. No SSH keys, no
+  manual `peer add`: as soon as a tunnel is up, the foreign bot/CLI can see and
+  control the Iran side automatically. Peers are auto-discovered from tunnels.
+  Firewalled to tunnel interfaces (`tm+`) and re-checked per request.
+
+### Changed
+- Peer management is now automatic; the old SSH-key-based `peer add` flow is
+  removed in favour of the agent. `tunnelctl peer list` / `peer run <tunnel>
+  <cmd>` and the bot's 🌐 Peers button use it.
+
 ## [1.1.0] - 2026-07-11
 
 ### Added

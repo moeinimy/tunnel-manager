@@ -85,8 +85,6 @@ main() {
         logs)           tunnel_logs "${1:-}" ;;
         peer)
             case "${1:-list}" in
-                add)    peer_add ;;
-                remove|rm) peer_remove "${2:-}" ;;
                 list|ls) peer_overview ;;
                 run)    shift; peer_run "$@" ;;
                 *)      peer_overview ;;
@@ -122,6 +120,7 @@ main() {
         __down)         require_root; tunnel_down_hook "${1:?tunnel name}" ;;
         monitor-run)    require_root; monitor_run ;;
         bot-run)        require_root; tg_bot_run ;;
+        agent-serve)    agent_serve ;;
         *)              log_error "Unknown command: $cmd"; usage; exit 1 ;;
     esac
 }

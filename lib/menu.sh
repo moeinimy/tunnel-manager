@@ -61,14 +61,16 @@ EOF
 }
 
 menu_peers() {
-    local c
-    ask_menu c "Peers (control other servers over the tunnel)" \
-        "List / status" "Add peer" "Remove peer" "Show my public key" "Back"
+    local c sel
+    ask_menu c "Peers (auto-discovered from tunnels; controlled over the tunnel)" \
+        "List / reachability" "Query a peer" "Back"
     case "$c" in
-        "List / status") peer_overview ;;
-        "Add peer")      peer_add ;;
-        "Remove peer")   peer_remove ;;
-        "Show my public key") peer_key_ensure && printf '\n%s\n' "$(peer_pubkey)" ;;
+        "List / reachability") peer_overview ;;
+        "Query a peer")
+            local -a p; mapfile -t p < <(peer_list | cut -f1)
+            [[ ${#p[@]} -gt 0 ]] || { log_warn "No peers yet (bring up a tunnel first)."; return 0; }
+            ask_menu sel "Select a peer" "${p[@]}"
+            printf '\n'; peer_run "$sel" list ;;
         *) : ;;
     esac
 }

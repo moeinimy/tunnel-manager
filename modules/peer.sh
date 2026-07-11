@@ -1,112 +1,101 @@
 #!/usr/bin/env bash
-# modules/peer.sh — remote peer management.
+# modules/peer.sh — zero-config multi-server control over the tunnel.
 #
-# Iran servers usually can't reach api.telegram.org, so the Telegram bot runs on
-# the foreign server. To let that one bot see/-control the Iran side too, we
-# register the Iran box as a "peer" reachable over the tunnel's inner IP by SSH,
-# and run `tunnelctl` on it remotely.
+# Iran boxes usually can't reach api.telegram.org, so the bot runs on the
+# foreign server. To let that one bot see/control the Iran side too, every
+# server runs a tiny "peer agent" (systemd socket + this handler) that answers
+# a small allowlist of tunnelctl commands — but ONLY when the request comes in
+# over a tunnel interface, from the connected tunnel peer's inner IP. Because
+# the tunnel is a private point-to-point link, no keys or manual setup are
+# needed: as soon as a tunnel is up, its remote end is controllable.
 
-TM_PEERS_FILE="$TM_CONFIG_DIR/peers.conf"
-TM_PEER_KEY="$TM_CONFIG_DIR/id_tm"
+TM_AGENT_ALLOW=(list status bandwidth report logs)   # read-only + restart below
 
-# peer_key_ensure — create a dedicated SSH keypair for peer control if missing.
-peer_key_ensure() {
-    [[ -f "$TM_PEER_KEY" ]] && return 0
-    mkdir -p "$TM_CONFIG_DIR"
-    ssh-keygen -t ed25519 -N '' -C "tunnel-manager@$(hostname)" -f "$TM_PEER_KEY" >/dev/null 2>&1 \
-        || { log_error "ssh-keygen failed (is openssh-client installed?)"; return 1; }
-    chmod 600 "$TM_PEER_KEY"
-    log_ok "Generated peer control key: ${TM_PEER_KEY}.pub"
+# ---------------------------------------------------------------------------
+# Server side — invoked per connection by tm-agent@.service (Accept=yes).
+# ---------------------------------------------------------------------------
+agent_serve() {
+    local src="${REMOTE_ADDR:-}" line
+    src="${src#::ffff:}"                     # normalise IPv4-mapped IPv6
+    read -r line || return 0
+
+    # Authorise: source must be the inner IP of a configured tunnel's peer.
+    local ok=no n
+    while read -r n; do
+        [[ -n "$n" ]] || continue
+        load_tunnel "$n" 2>/dev/null || continue
+        if [[ "${TUN[INNER_REMOTE]:-}" == "$src" ]]; then ok=yes; break; fi
+    done < <(list_tunnels)
+    if [[ "$ok" != yes ]]; then printf 'forbidden (source %s)\n' "$src"; return 0; fi
+
+    # Allowlist the command; arguments are passed to tunnelctl as argv (never
+    # shell-evaluated), so there is no injection surface.
+    # shellcheck disable=SC2086
+    set -- $line
+    local cmd="${1:-}"
+    case "$cmd" in
+        list|status|bandwidth|report|logs|restart)
+            NO_COLOR=1 "$TM_CTL" "$@" 2>&1 ;;
+        *)  printf 'denied: %s\n' "$cmd" ;;
+    esac
 }
 
-# peer_pubkey — print the public key to authorise on peers.
-peer_pubkey() { cat "${TM_PEER_KEY}.pub" 2>/dev/null; }
-
-# _ssh_opts — common non-interactive SSH options.
-_ssh_opts() {
-    printf '%s' "-i $TM_PEER_KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=6 -o ServerAliveInterval=5"
+# agent_firewall ensure|remove — allow the agent port only on tunnel interfaces
+# (tm*), and drop it everywhere else (blocks public/spoofed access).
+agent_firewall() {
+    local action="${1:-ensure}"
+    local fn=_ipt_ensure; [[ "$action" == remove ]] && fn=_ipt_remove
+    "$fn" filter INPUT -p tcp --dport "$TM_AGENT_PORT" -i 'tm+' -j ACCEPT
+    "$fn" filter INPUT -p tcp --dport "$TM_AGENT_PORT" -j DROP
 }
 
+# ---------------------------------------------------------------------------
+# Client side — query a peer over the tunnel.
+# ---------------------------------------------------------------------------
+# agent_query IP CMD... — send CMD to the agent at IP, print its reply.
+agent_query() {
+    local ip="$1"; shift
+    TQ_IP="$ip" TQ_PORT="$TM_AGENT_PORT" TQ_CMD="$*" timeout 15 bash -c '
+        exec 3<>"/dev/tcp/$TQ_IP/$TQ_PORT" || exit 1
+        printf "%s\n" "$TQ_CMD" >&3
+        cat <&3
+    ' 2>/dev/null || { echo "(peer unreachable)"; return 1; }
+}
+
+# Peers are auto-derived from tunnels: each tunnel's remote inner IP is a peer.
+# peer_list -> lines "tunnelname<TAB>inner_remote"
 peer_list() {
-    [[ -f "$TM_PEERS_FILE" ]] || return 0
-    awk -F'\t' 'NF>=2 {print $1"\t"$2}' "$TM_PEERS_FILE"
+    local n
+    while read -r n; do
+        [[ -n "$n" ]] || continue
+        load_tunnel "$n" 2>/dev/null || continue
+        [[ -n "${TUN[INNER_REMOTE]:-}" ]] && printf '%s\t%s\n' "$n" "${TUN[INNER_REMOTE]}"
+    done < <(list_tunnels)
 }
 
-peer_target() {
-    [[ -f "$TM_PEERS_FILE" ]] || return 1
-    awk -F'\t' -v n="$1" '$1==n {print $2; exit}' "$TM_PEERS_FILE"
-}
-
-peer_exists() { [[ -n "$(peer_target "$1" 2>/dev/null)" ]]; }
-
-# peer_add — interactive/registration of a peer, verifying connectivity.
-peer_add() {
-    require_root
-    ensure_dirs
-    peer_key_ensure || return 1
-    local name target
-    ask_valid name "Peer name (e.g. iran)" is_tunnel_name
-    ask target "SSH target (user@host, host reachable over the tunnel, e.g. root@10.20.0.6)" ""
-    [[ -n "$target" ]] || { log_error "empty target"; return 1; }
-
-    log_info "Authorise this key on the peer first:"
-    printf '\n  %s%s%s\n\n' "$C_YELLOW" "$(peer_pubkey)" "$C_RESET"
-    printf 'On the peer run:\n  mkdir -p ~/.ssh && echo "%s" >> ~/.ssh/authorized_keys\n\n' "$(peer_pubkey)"
-    confirm "Have you added the key on the peer?" no || { log_warn "Aborted."; return 1; }
-
-    log_info "Testing SSH to $target …"
-    # shellcheck disable=SC2046
-    if ssh $(_ssh_opts) "$target" 'echo ok' 2>/dev/null | grep -q ok; then
-        mkdir -p "$TM_CONFIG_DIR"; touch "$TM_PEERS_FILE"
-        # replace any existing entry with this name
-        local tmp; tmp="$(mktemp)"
-        awk -F'\t' -v n="$name" '$1!=n' "$TM_PEERS_FILE" >"$tmp" 2>/dev/null || true
-        printf '%s\t%s\n' "$name" "$target" >>"$tmp"
-        mv -f "$tmp" "$TM_PEERS_FILE"; chmod 600 "$TM_PEERS_FILE"
-        log_ok "Peer '$name' added ($target)."
-    else
-        log_error "SSH test failed. Check the key is authorised and $target is reachable."
-        return 1
-    fi
-}
-
-peer_remove() {
-    require_root
-    local name="$1"; [[ -n "$name" ]] || { peer_pick name || return 0; }
-    [[ -f "$TM_PEERS_FILE" ]] || return 0
-    local tmp; tmp="$(mktemp)"
-    awk -F'\t' -v n="$name" '$1!=n' "$TM_PEERS_FILE" >"$tmp" && mv -f "$tmp" "$TM_PEERS_FILE"
-    log_ok "Peer '$name' removed."
-}
-
-peer_pick() {
-    local __v="$1" sel; local -a p
-    mapfile -t p < <(peer_list | cut -f1)
-    [[ ${#p[@]} -gt 0 ]] || { log_warn "No peers configured."; return 1; }
-    ask_menu sel "Select a peer" "${p[@]}"
-    printf -v "$__v" '%s' "$sel"
-}
-
-# peer_run NAME CMD... — run `tunnelctl CMD...` on the named peer, print output.
+# peer_run NAME CMD... — run a command on the peer reached via tunnel NAME.
+# NAME may be a tunnel name or a raw inner IP.
 peer_run() {
     local name="$1"; shift
-    local target; target="$(peer_target "$name")"
-    [[ -n "$target" ]] || { echo "unknown peer: $name"; return 1; }
-    # shellcheck disable=SC2046
-    NO_COLOR=1 ssh $(_ssh_opts) "$target" "NO_COLOR=1 tunnelctl $*" 2>&1
+    local ip="$name"
+    if tunnel_exists "$name"; then load_tunnel "$name"; ip="${TUN[INNER_REMOTE]}"; fi
+    [[ -n "$ip" ]] || { echo "unknown peer: $name"; return 1; }
+    agent_query "$ip" "$@"
 }
 
-# peer_overview — show configured peers on the CLI.
+# peer_overview — list auto-discovered peers and their reachability.
 peer_overview() {
-    ui_title "Peers"
-    local any=0 name target
-    while IFS=$'\t' read -r name target; do
+    ui_title "Peers (auto-discovered from tunnels)"
+    local any=0 name ip
+    while IFS=$'\t' read -r name ip; do
         [[ -n "$name" ]] || continue
         any=1
-        local state="unreachable"
-        # shellcheck disable=SC2046
-        ssh $(_ssh_opts) "$target" 'echo ok' >/dev/null 2>&1 && state="reachable"
-        ui_kv "$name" "$target  ($(status_dot "$( [[ $state == reachable ]] && echo up || echo down )") $state)"
+        local reply; reply="$(agent_query "$ip" list 2>/dev/null | head -1)"
+        if [[ -n "$reply" && "$reply" != "(peer unreachable)" ]]; then
+            ui_kv "$name" "$ip  ($(status_dot up) agent reachable)"
+        else
+            ui_kv "$name" "$ip  ($(status_dot down) no agent — update the peer to v1.2+)"
+        fi
     done < <(peer_list)
-    (( any )) || printf '  %sNo peers configured.%s\n' "$C_DIM" "$C_RESET"
+    (( any )) || printf '  %sNo tunnels yet — peers appear automatically once a tunnel is up.%s\n' "$C_DIM" "$C_RESET"
 }

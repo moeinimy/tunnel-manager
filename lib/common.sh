@@ -20,6 +20,8 @@
 : "${TM_TELEGRAM_FILE:=$TM_CONFIG_DIR/telegram.conf}"
 # Absolute path to the installed CLI (referenced by generated systemd units).
 : "${TM_CTL:=/usr/local/bin/tunnelctl}"
+# Peer-control agent port (served only over tunnel interfaces).
+: "${TM_AGENT_PORT:=8271}"
 
 # systemd unit prefix used for per-tunnel services.
 TM_UNIT_PREFIX="tm-tunnel-"
