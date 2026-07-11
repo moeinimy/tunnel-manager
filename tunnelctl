@@ -81,7 +81,8 @@ main() {
         disable)        tunnel_disable "${1:-}" ;;
         status)         tunnel_status "${1:-}" ;;
         list|ls)        tunnel_overview ;;
-        bandwidth|traffic) tunnel_bandwidth ;;
+        bandwidth)      tunnel_bandwidth ;;
+        usage|traffic)  report_usage | sed -e 's/<[^>]*>//g'; echo ;;
         logs)           tunnel_logs "${1:-}" ;;
         peer)
             case "${1:-list}" in

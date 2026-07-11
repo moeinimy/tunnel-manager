@@ -96,7 +96,7 @@ tg_disable() {
 # Inline keyboards
 # ---------------------------------------------------------------------------
 tg_kb_main() {
-    printf '%s' '{"inline_keyboard":[[{"text":"📊 Status","callback_data":"status"},{"text":"🖥 System","callback_data":"system"}],[{"text":"📈 Bandwidth","callback_data":"bandwidth"},{"text":"🚇 Tunnels","callback_data":"tunnels"}],[{"text":"🔄 Restart","callback_data":"restart_menu"},{"text":"📋 Report","callback_data":"report"}],[{"text":"🌐 Peers","callback_data":"peers"},{"text":"♻️ Reboot","callback_data":"reboot_confirm"}]]}'
+    printf '%s' '{"inline_keyboard":[[{"text":"📊 Status","callback_data":"status"},{"text":"🖥 System","callback_data":"system"}],[{"text":"📈 Bandwidth","callback_data":"bandwidth"},{"text":"📅 Usage","callback_data":"usage"}],[{"text":"🚇 Tunnels","callback_data":"tunnels"},{"text":"🔄 Restart","callback_data":"restart_menu"}],[{"text":"📋 Report","callback_data":"report"},{"text":"🌐 Peers","callback_data":"peers"}],[{"text":"♻️ Reboot","callback_data":"reboot_confirm"}]]}'
 }
 
 # tg_kb_tunnels ACTION — one button per tunnel with callback "ACTION:name".
@@ -161,7 +161,8 @@ tg_command() {
         /start|/menu|/help) tg_action menu "$chat" ;;
         /status|/tunnels)   tg_action status "$chat" ;;
         /system)            tg_action system "$chat" ;;
-        /bandwidth|/traffic)tg_action bandwidth "$chat" ;;
+        /bandwidth)         tg_action bandwidth "$chat" ;;
+        /usage|/traffic)    tg_action usage "$chat" ;;
         /report)            tg_action report "$chat" ;;
         /peers)             tg_action peers "$chat" ;;
         /reboot)            tg_action reboot_confirm "$chat" ;;
@@ -181,6 +182,7 @@ tg_action() {
         status|tunnels) tg_send "$(tg_report_tunnels)" "$chat" ;;
         system)      tg_send "$(tg_report_system)" "$chat" ;;
         bandwidth)   tg_send "$(tg_report_bandwidth)" "$chat" ;;
+        usage)       tg_send "$(report_usage)" "$chat" ;;
         report)      tg_send "$(report_build daily)" "$chat" ;;
         peers)       tg_send_kb "🌐 <b>Peers</b> — tap to view a remote server:" "$(tg_kb_peers)" "$chat" ;;
         restart_menu)tg_send_kb "🔄 Pick a tunnel to restart:" "$(tg_kb_tunnels restart)" "$chat" ;;

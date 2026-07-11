@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-07-11
+
+### Added
+- **Historical traffic usage over time windows.** The monitor now records
+  monotonic per-tunnel totals (surviving interface counter resets) and periodic
+  history samples, so you can see data used in the **last 1h / 12h / 24h / 7d /
+  30d / all-time**. Available as `tunnelctl usage`, in the menu, and via the
+  bot's new **📅 Usage** button / `/usage` command. History is bounded (~40 days)
+  and removed with the tunnel.
+
 ## [1.2.0] - 2026-07-11
 
 ### Added

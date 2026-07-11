@@ -60,6 +60,42 @@ report_send() {
     fi
 }
 
+# traffic_window NAME SECONDS -> prints "RX TX" bytes used in the last SECONDS.
+# SECONDS may be the literal "all" for lifetime totals.
+traffic_window() {
+    local name="$1" secs="$2"
+    local hist="$TM_STATE_DIR/history/${name}.hist"
+    state_load "$name"
+    local cur_rx="${ST[ACCUM_RX]:-0}" cur_tx="${ST[ACCUM_TX]:-0}" now
+    now="$(date +%s)"
+    if [[ "$secs" == all || ! -s "$hist" ]]; then
+        printf '%s %s' "$cur_rx" "$cur_tx"; return
+    fi
+    local cutoff=$(( now - secs )) base_rx base_tx
+    read -r base_rx base_tx < <(awk -v c="$cutoff" '
+        { if ($1<=c){ brx=$2; btx=$3; f=1 } else if(!s){ frx=$2; ftx=$3; s=1 } }
+        END{ if(f) print brx, btx; else print (s?frx:0), (s?ftx:0) }' "$hist")
+    printf '%s %s' "$(( cur_rx - ${base_rx:-0} ))" "$(( cur_tx - ${base_tx:-0} ))"
+}
+
+# report_usage — per-tunnel traffic used across time windows (HTML for Telegram).
+report_usage() {
+    local out="📅 <b>Traffic usage — $(hostname)</b>\n" n rx tx
+    local -a t; mapfile -t t < <(list_tunnels)
+    [[ ${#t[@]} -eq 0 ]] && { printf 'No tunnels.'; return; }
+    local -a wins=(3600 43200 86400 604800 2592000 all)
+    local -a labs=("1h" "12h" "24h" "7d" "30d" "all")
+    for n in "${t[@]}"; do
+        out+="\n<b>${n}</b>\n"
+        local i
+        for i in "${!wins[@]}"; do
+            read -r rx tx <<<"$(traffic_window "$n" "${wins[$i]}")"
+            out+="  ${labs[$i]}: ↓ $(human_bytes "$rx")  ↑ $(human_bytes "$tx")\n"
+        done
+    done
+    printf '%b' "$out"
+}
+
 # report_show PERIOD — print report to the terminal (strip simple HTML tags).
 report_show() {
     report_build "${1:-daily}" | sed -e 's/<[^>]*>//g'

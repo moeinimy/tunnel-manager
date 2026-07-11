@@ -56,6 +56,17 @@ monitor_tunnel() {
     (( rxr > ${ST[PEAK_RX_RATE]:-0} )) && ST[PEAK_RX_RATE]="$rxr"
     (( txr > ${ST[PEAK_TX_RATE]:-0} )) && ST[PEAK_TX_RATE]="$txr"
 
+    # Monotonic lifetime totals (survive interface counter resets on restart)
+    # feed the historical usage windows (1h/24h/week/month/all).
+    local drx=0 dtx=0
+    if (( prev_ts > 0 )); then
+        (( rx >= prev_rx )) && drx=$(( rx - prev_rx )) || drx=$rx
+        (( tx >= prev_tx )) && dtx=$(( tx - prev_tx )) || dtx=$tx
+    fi
+    ST[ACCUM_RX]=$(( ${ST[ACCUM_RX]:-0} + drx ))
+    ST[ACCUM_TX]=$(( ${ST[ACCUM_TX]:-0} + dtx ))
+    traffic_record "$name" "$now"
+
     # --- latency / loss ---------------------------------------------------
     monitor_probe_latency "$name"
 
@@ -88,6 +99,21 @@ monitor_tunnel() {
         tg_notify "🔴 Tunnel <b>$name</b> is DOWN on $(hostname) after ${TM_MONITOR_RETRIES} restart attempts."
     fi
     state_save "$name"
+}
+
+# traffic_record NAME NOW — append a timestamped totals sample to the tunnel's
+# history file (throttled), so usage over arbitrary windows can be computed.
+traffic_record() {
+    local name="$1" now="$2"
+    local interval="${TM_HIST_INTERVAL:-300}"
+    (( now - ${ST[HIST_TS]:-0} >= interval )) || return 0
+    ST[HIST_TS]="$now"
+    local dir="$TM_STATE_DIR/history" hist
+    mkdir -p "$dir"; hist="$dir/${name}.hist"
+    printf '%s %s %s\n' "$now" "${ST[ACCUM_RX]:-0}" "${ST[ACCUM_TX]:-0}" >>"$hist"
+    # Bound growth (~40 days at the default 5-minute cadence).
+    local lines; lines="$(wc -l <"$hist" 2>/dev/null || echo 0)"
+    if (( lines > 12500 )); then tail -n 12000 "$hist" >"$hist.tmp" && mv -f "$hist.tmp" "$hist"; fi
 }
 
 # monitor_probe_latency NAME — record reachability latency/loss into state.

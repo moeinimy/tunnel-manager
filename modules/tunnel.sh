@@ -82,6 +82,7 @@ tunnel_remove() {
     [[ "${TUN[PROTOCOL]}" == paqet ]] && rm -f "$(paqet_cfg "$name")"
     [[ -n "${TUN[IPAM_INDEX]:-}" ]] && ipam_free "$name"
     state_delete "$name"
+    rm -f "$TM_STATE_DIR/history/${name}.hist"
     delete_tunnel_file "$name"
     log_ok "Tunnel '$name' removed."
     tg_notify "🗑️ Tunnel <b>$name</b> removed on $(hostname)"

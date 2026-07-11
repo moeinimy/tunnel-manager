@@ -34,7 +34,7 @@ agent_serve() {
     set -- $line
     local cmd="${1:-}"
     case "$cmd" in
-        list|status|bandwidth|report|logs|restart)
+        list|status|bandwidth|usage|traffic|report|logs|restart)
             NO_COLOR=1 "$TM_CTL" "$@" 2>&1 ;;
         *)  printf 'denied: %s\n' "$cmd" ;;
     esac
@@ -55,7 +55,7 @@ agent_firewall() {
 # agent_query IP CMD... — send CMD to the agent at IP, print its reply.
 agent_query() {
     local ip="$1"; shift
-    TQ_IP="$ip" TQ_PORT="$TM_AGENT_PORT" TQ_CMD="$*" timeout 15 bash -c '
+    TQ_IP="$ip" TQ_PORT="$TM_AGENT_PORT" TQ_CMD="$*" timeout 8 bash -c '
         exec 3<>"/dev/tcp/$TQ_IP/$TQ_PORT" || exit 1
         printf "%s\n" "$TQ_CMD" >&3
         cat <&3
