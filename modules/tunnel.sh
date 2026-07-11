@@ -55,6 +55,8 @@ tunnel_add() {
 
     save_tunnel
     svc_install "$name"
+    # Auto-register this tunnel's remote as a controllable peer (all protocols).
+    agent_firewall ensure 2>/dev/null || true
     log_ok "Tunnel '$name' created."
 
     if confirm "Enable auto-start on boot?" yes; then
@@ -89,6 +91,7 @@ tunnel_remove() {
     state_delete "$name"
     rm -f "$TM_STATE_DIR/history/${name}.hist"
     delete_tunnel_file "$name"
+    agent_firewall ensure 2>/dev/null || true    # refresh peer whitelist
     log_ok "Tunnel '$name' removed."
     tg_notify "🗑️ Tunnel <b>$name</b> removed on $(hostname)"
 }
@@ -96,6 +99,22 @@ tunnel_remove() {
 # ---------------------------------------------------------------------------
 # Edit (a focused subset of safely-editable fields)
 # ---------------------------------------------------------------------------
+# Internal profile keys the user should not edit directly.
+_TM_NOEDIT_KEYS=" NAME PROTOCOL ROLE CREATED_AT IPAM_INDEX IFNAME INNER_LOCAL INNER_REMOTE INNER_CIDR PAQET_ROLE BH_ROLE RH_ROLE GO_ROLE FRP_ROLE WW_ROLE GO_USER "
+
+# _field_label KEY — a friendly hint for known keys (helps identify ports).
+_field_label() {
+    case "$1" in
+        MTU) echo "MTU (packet size)" ;;
+        PAQET_PORT|BH_PORT|RH_PORT|GO_PORT|FRP_PORT|WW_PORT) echo "$1 (tunnel/control port)" ;;
+        WW_USER_PORT) echo "WW_USER_PORT (local port users connect to)" ;;
+        WW_TARGET_PORT|GO_TARGET) echo "$1 (destination on the exit side)" ;;
+        FORWARDS|BH_PORTS|RH_PORTS|GO_PORTS|FRP_PORTS) echo "$1 (port map)" ;;
+        *_SECRET|*_TOKEN|*_PASS|*_PASSWORD|GRE_KEY|WW_KEY) echo "$1 (secret — must match peer)" ;;
+        *) echo "$1" ;;
+    esac
+}
+
 tunnel_edit() {
     require_root
     local name="${1:-}"
@@ -103,19 +122,42 @@ tunnel_edit() {
     tunnel_exists "$name" || { log_error "No such tunnel: $name"; return 1; }
     load_tunnel "$name"
 
-    local field
-    ask_menu field "Field to edit" "MTU" "Auto-start" "Forwarding / ports" "Cancel"
-    case "$field" in
-        MTU)          ask_valid TUN[MTU] "New MTU" is_mtu "${TUN[MTU]}" ;;
-        "Auto-start")
-            if confirm "Enable auto-start?" yes; then TUN[AUTOSTART]=yes; svc_enable "$name"
-            else TUN[AUTOSTART]=no; svc_disable "$name"; fi ;;
-        "Forwarding / ports")
-            if [[ "${TUN[PROTOCOL]}" == gre ]]; then
-                if [[ "${TUN[ROLE]}" == iran ]]; then gre_wizard_forward_mode
-                else log_warn "Forwarding is configured on the Iran side."; return 0; fi
-            else paqet_wizard_forwards; fi ;;
-        *) return 0 ;;
+    # Build a protocol-aware list of editable KEY=VALUE fields.
+    local -a labels=() ; local k
+    while read -r k; do
+        [[ "$_TM_NOEDIT_KEYS" == *" $k "* ]] && continue
+        labels+=("$(_field_label "$k")  =  ${TUN[$k]}")
+    done < <(printf '%s\n' "${!TUN[@]}" | sort)
+    labels+=("Toggle auto-start (now: ${TUN[AUTOSTART]:-no})" "Cancel")
+
+    local sel
+    ask_menu sel "Edit ${TUN[PROTOCOL]} tunnel '$name' — pick a setting" "${labels[@]}"
+    case "$sel" in
+        "Cancel") return 0 ;;
+        "Toggle auto-start"*)
+            if [[ "${TUN[AUTOSTART]:-no}" == yes ]]; then TUN[AUTOSTART]=no; svc_disable "$name"
+            else TUN[AUTOSTART]=yes; svc_enable "$name"; fi ;;
+        *)
+            # Recover the real key from the "LABEL  =  value" selection.
+            local lbl="${sel%%  =  *}" key
+            key="${lbl%% (*}"          # strip the "(hint)" suffix if present
+            [[ -n "${TUN[$key]+x}" ]] || { log_error "Cannot map '$lbl' to a field."; return 1; }
+            local newval
+            case "$key" in
+                MTU)          ask_valid newval "New MTU" is_mtu "${TUN[$key]}" ;;
+                *PORT|*_PORT) ask_valid newval "New value for $key" is_port "${TUN[$key]}" ;;
+                *)            ask newval "New value for $key" "${TUN[$key]}" ;;
+            esac
+            TUN[$key]="$newval"
+            # Regenerate the protocol's config file if it keeps one out-of-band.
+            case "${TUN[PROTOCOL]}" in
+                paqet) paqet_generate_config ;;
+                backhaul) backhaul_generate_config ;;
+                rathole) rathole_generate_config ;;
+                gost) gost_generate_config ;;
+                frp) frp_generate_config ;;
+                waterwall) ww_generate_config ;;
+            esac ;;
     esac
     save_tunnel
     svc_install "$name"

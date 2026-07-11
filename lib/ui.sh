@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 # lib/ui.sh — terminal UI helpers: banners, boxes, prompts with validation.
 
-# ui_banner — colorful program header.
+# ui_banner — colorful program header (name + version).
 ui_banner() {
-    printf '%s' "$C_CYAN"
+    local ver; ver="$(cat "$TM_HOME/VERSION" 2>/dev/null | tr -d '[:space:]')"
+    printf '%b' "${C_CYAN}${C_BOLD}"
     cat <<'EOF'
   ╔════════════════════════════════════════════════════════╗
-  ║        T U N N E L   M A N A G E R                     ║
-  ║        GRE + Paqet · unified · production-ready         ║
+  ║          m o e i n i m y   tunnel manager              ║
+  ║   GRE · Paqet · Backhaul · Rathole · GOST · FRP · WW   ║
   ╚════════════════════════════════════════════════════════╝
 EOF
-    printf '%s' "$C_RESET"
+    printf '%b' "$C_RESET"
+    printf '  %sv%s · 7 protocols · Iran ↔ foreign%s\n' "$C_DIM" "${ver:-?}" "$C_RESET"
 }
 
 # ui_title TEXT — section header line.

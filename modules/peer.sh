@@ -10,6 +10,28 @@
 # needed: as soon as a tunnel is up, its remote end is controllable.
 
 TM_AGENT_ALLOW=(list status bandwidth report logs)   # read-only + restart below
+: "${TM_AGENT_PORT:=8271}"
+
+# _peer_ip — the address to reach a tunnel's remote agent: the private inner IP
+# for GRE (stays on the tunnel), or the peer's public IP for userspace tunnels.
+_peer_ip() {
+    if [[ "${TUN[PROTOCOL]:-}" == gre && -n "${TUN[INNER_REMOTE]:-}" ]]; then
+        printf '%s' "${TUN[INNER_REMOTE]}"
+    else
+        printf '%s' "${TUN[REMOTE_IP]:-}"
+    fi
+}
+
+# peer_ips_all — every configured peer address (deduplicated), for firewalling.
+peer_ips_all() {
+    local n ip
+    while read -r n; do
+        [[ -n "$n" ]] || continue
+        load_tunnel "$n" 2>/dev/null || continue
+        ip="$(_peer_ip)"
+        [[ -n "$ip" && "$ip" != 0.0.0.0 ]] && printf '%s\n' "$ip"
+    done < <(list_tunnels) | sort -u
+}
 
 # ---------------------------------------------------------------------------
 # Server side — invoked per connection by tm-agent@.service (Accept=yes).
@@ -19,13 +41,12 @@ agent_serve() {
     src="${src#::ffff:}"                     # normalise IPv4-mapped IPv6
     read -r line || return 0
 
-    # Authorise: source must be the inner IP of a configured tunnel's peer.
-    local ok=no n
-    while read -r n; do
-        [[ -n "$n" ]] || continue
-        load_tunnel "$n" 2>/dev/null || continue
-        if [[ "${TUN[INNER_REMOTE]:-}" == "$src" ]]; then ok=yes; break; fi
-    done < <(list_tunnels)
+    # Authorise: source must be a configured tunnel peer (inner IP for GRE, or
+    # the peer's public IP for userspace tunnels).
+    local ok=no ip
+    while read -r ip; do
+        [[ "$ip" == "$src" ]] && { ok=yes; break; }
+    done < <(peer_ips_all)
     if [[ "$ok" != yes ]]; then printf 'forbidden (source %s)\n' "$src"; return 0; fi
 
     # Allowlist the command; arguments are passed to tunnelctl as argv (never
@@ -40,13 +61,31 @@ agent_serve() {
     esac
 }
 
-# agent_firewall ensure|remove — allow the agent port only on tunnel interfaces
-# (tm*), and drop it everywhere else (blocks public/spoofed access).
+# agent_firewall ensure|remove — the agent port is reachable only from the
+# GRE tunnel interfaces (tm*) and from each configured peer's IP; dropped
+# everywhere else. Rebuilt from scratch each call so newly-added peers are
+# whitelisted (ACCEPTs inserted before the DROP).
 agent_firewall() {
-    local action="${1:-ensure}"
-    local fn=_ipt_ensure; [[ "$action" == remove ]] && fn=_ipt_remove
-    "$fn" filter INPUT -p tcp --dport "$TM_AGENT_PORT" -i 'tm+' -j ACCEPT
-    "$fn" filter INPUT -p tcp --dport "$TM_AGENT_PORT" -j DROP
+    local action="${1:-ensure}" p ip
+    # Always clear our managed rules first.
+    while iptables -C INPUT -p tcp --dport "$TM_AGENT_PORT" -i 'tm+' -j ACCEPT 2>/dev/null; do
+        iptables -D INPUT -p tcp --dport "$TM_AGENT_PORT" -i 'tm+' -j ACCEPT 2>/dev/null || break; done
+    while iptables -C INPUT -p tcp --dport "$TM_AGENT_PORT" -j DROP 2>/dev/null; do
+        iptables -D INPUT -p tcp --dport "$TM_AGENT_PORT" -j DROP 2>/dev/null || break; done
+    while read -r ip; do
+        [[ -n "$ip" ]] || continue
+        while iptables -C INPUT -p tcp -s "$ip" --dport "$TM_AGENT_PORT" -j ACCEPT 2>/dev/null; do
+            iptables -D INPUT -p tcp -s "$ip" --dport "$TM_AGENT_PORT" -j ACCEPT 2>/dev/null || break; done
+    done < <(peer_ips_all)
+    [[ "$action" == remove ]] && return 0
+
+    # Rebuild: peer IPs + tunnel interfaces ACCEPT (inserted on top), then DROP.
+    iptables -I INPUT 1 -p tcp --dport "$TM_AGENT_PORT" -i 'tm+' -j ACCEPT
+    while read -r ip; do
+        [[ -n "$ip" ]] || continue
+        iptables -I INPUT 1 -p tcp -s "$ip" --dport "$TM_AGENT_PORT" -j ACCEPT
+    done < <(peer_ips_all)
+    iptables -A INPUT -p tcp --dport "$TM_AGENT_PORT" -j DROP
 }
 
 # ---------------------------------------------------------------------------
@@ -65,20 +104,21 @@ agent_query() {
 # Peers are auto-derived from tunnels: each tunnel's remote inner IP is a peer.
 # peer_list -> lines "tunnelname<TAB>inner_remote"
 peer_list() {
-    local n
+    local n ip
     while read -r n; do
         [[ -n "$n" ]] || continue
         load_tunnel "$n" 2>/dev/null || continue
-        [[ -n "${TUN[INNER_REMOTE]:-}" ]] && printf '%s\t%s\n' "$n" "${TUN[INNER_REMOTE]}"
+        ip="$(_peer_ip)"
+        [[ -n "$ip" && "$ip" != 0.0.0.0 ]] && printf '%s\t%s\n' "$n" "$ip"
     done < <(list_tunnels)
 }
 
 # peer_run NAME CMD... — run a command on the peer reached via tunnel NAME.
-# NAME may be a tunnel name or a raw inner IP.
+# NAME may be a tunnel name or a raw peer IP.
 peer_run() {
     local name="$1"; shift
     local ip="$name"
-    if tunnel_exists "$name"; then load_tunnel "$name"; ip="${TUN[INNER_REMOTE]}"; fi
+    if tunnel_exists "$name"; then load_tunnel "$name"; ip="$(_peer_ip)"; fi
     [[ -n "$ip" ]] || { echo "unknown peer: $name"; return 1; }
     agent_query "$ip" "$@"
 }

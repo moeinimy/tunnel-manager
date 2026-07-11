@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.9.2] - 2026-07-11
+
+### Added
+- **Auto-peer for all protocols.** The controllable-peer whitelist now includes
+  userspace tunnels (Backhaul/Rathole/GOST/FRP/WaterWall) via the peer's public
+  IP, not just GRE inner IPs. The agent firewall is rebuilt (and peers
+  registered) automatically whenever a tunnel is added or removed.
+- **Universal, protocol-aware Edit Tunnel.** Editing a tunnel now lists that
+  protocol's actual fields with current values — MTU, tunnel/control port, user
+  port, target port, tokens/passwords, port maps — and regenerates the config +
+  restarts on change.
+
+### Changed
+- **Rebranded to "moeinimy tunnel manager"** with the version shown in the banner.
+
 ## [1.9.0] - 2026-07-11
 
 ### Changed
