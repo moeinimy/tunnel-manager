@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.7] - 2026-07-11
+
+### Added
+- **Full-relay forwarding mode for GRE.** When adding/editing an Iran-side GRE
+  tunnel you can now pick: relay **ALL** ports to the peer (except a protected
+  set like SSH), specific ports only, or none. The relay rules (ip_forward,
+  DNAT, SNAT, FORWARD) are applied automatically and persist across reboots via
+  the tunnel's systemd unit — no more manual iptables.
+
+### Changed
+- **Installer now auto-applies network optimization** (reversible) and enables
+  IP forwarding, so forwarding tunnels work out of the box. Post-install steps
+  reduced to just "Add tunnel". Pass `--no-optimize` to skip.
+
 ## [1.0.6] - 2026-07-11
 
 ### Fixed

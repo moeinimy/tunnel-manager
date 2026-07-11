@@ -98,14 +98,16 @@ tunnel_edit() {
     load_tunnel "$name"
 
     local field
-    ask_menu field "Field to edit" "MTU" "Auto-start" "Port forwards" "Cancel"
+    ask_menu field "Field to edit" "MTU" "Auto-start" "Forwarding / ports" "Cancel"
     case "$field" in
         MTU)          ask_valid TUN[MTU] "New MTU" is_mtu "${TUN[MTU]}" ;;
         "Auto-start")
             if confirm "Enable auto-start?" yes; then TUN[AUTOSTART]=yes; svc_enable "$name"
             else TUN[AUTOSTART]=no; svc_disable "$name"; fi ;;
-        "Port forwards")
-            if [[ "${TUN[PROTOCOL]}" == gre ]]; then gre_wizard_forwards
+        "Forwarding / ports")
+            if [[ "${TUN[PROTOCOL]}" == gre ]]; then
+                if [[ "${TUN[ROLE]}" == iran ]]; then gre_wizard_forward_mode
+                else log_warn "Forwarding is configured on the Iran side."; return 0; fi
             else paqet_wizard_forwards; fi ;;
         *) return 0 ;;
     esac

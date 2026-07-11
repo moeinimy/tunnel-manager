@@ -127,6 +127,14 @@ $TM_LOG_DIR/*.log {
 }
 EOF
 
+# Apply network optimization automatically (reversible) unless opted out. This
+# also guarantees ip_forward is on, so forwarding tunnels work out of the box.
+if [[ "${1:-}" != "--no-optimize" && "${2:-}" != "--no-optimize" ]]; then
+    # shellcheck source=/dev/null
+    . "$INSTALL_DIR/modules/optimize.sh"
+    TM_ASSUME_YES=1 optimize_apply || log_warn "Optimization step reported issues (continuing)."
+fi
+
 # Re-install per-tunnel units on update (their contents may have changed).
 if [[ "$UPDATE_MODE" == yes ]]; then
     while read -r n; do
@@ -140,15 +148,11 @@ log_ok "Tunnel Manager installed."
 if [[ "$UPDATE_MODE" != yes ]]; then
     cat <<EOF
 
-${C_GREEN}${C_BOLD}Done!${C_RESET} Launch the menu with:
+${C_GREEN}${C_BOLD}Done!${C_RESET} Network stack tuned, forwarding enabled. Launch:
 
     ${C_CYAN}sudo tunnelctl${C_RESET}
 
-Quick start:
-  1) ${C_CYAN}sudo tunnelctl optimize apply${C_RESET}   # tune the network stack (reversible)
-  2) ${C_CYAN}sudo tunnelctl add${C_RESET}               # create your first tunnel
-  3) ${C_CYAN}sudo tunnelctl telegram config${C_RESET}   # (optional) connect a Telegram bot
-
-Edit ${C_CYAN}$TM_SETTINGS_FILE${C_RESET} to set your GitHub repo (for updates).
+Then just: ${C_CYAN}Add tunnel${C_RESET} (pick GRE or Paqet, and a forwarding mode).
+Telegram is optional: ${C_CYAN}sudo tunnelctl telegram config${C_RESET}
 EOF
 fi

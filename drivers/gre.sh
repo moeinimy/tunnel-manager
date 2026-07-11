@@ -55,13 +55,30 @@ gre_wizard() {
         fi
     fi
 
-    # Optional port forwards (mostly on the Iran side).
+    # Forwarding mode (how real traffic uses the tunnel) — Iran side only.
     TUN[FORWARDS]=""
-    if confirm "Add port-forwarding rules for this tunnel?" no; then
-        gre_wizard_forwards
-    fi
+    TUN[FORWARD_MODE]="none"
+    TUN[FORWARD_EXCEPT]="22"
+    [[ "${TUN[ROLE]}" == iran ]] && gre_wizard_forward_mode
 
     ui_kv "Inner network" "$(ipam_network "$idx")/30  (local ${TUN[INNER_LOCAL]} <-> peer ${TUN[INNER_REMOTE]})"
+}
+
+# gre_wizard_forward_mode — choose how traffic uses the tunnel (Iran side).
+gre_wizard_forward_mode() {
+    local fmode
+    ask_menu fmode "How should traffic use this tunnel?" \
+        "relay ALL ports to peer (full relay)" \
+        "specific ports only" \
+        "none (just the private link)"
+    case "$fmode" in
+        relay*)
+            TUN[FORWARD_MODE]="all"; TUN[FORWARDS]=""
+            ask TUN[FORWARD_EXCEPT] "Ports to keep LOCAL here (comma-sep; keep your SSH port!)" "${TUN[FORWARD_EXCEPT]:-22}" ;;
+        specific*)
+            TUN[FORWARD_MODE]="ports"; gre_wizard_forwards ;;
+        *)  TUN[FORWARD_MODE]="none"; TUN[FORWARDS]="" ;;
+    esac
 }
 
 # gre_wizard_forwards — collect proto:localport:destport entries into FORWARDS.
@@ -131,7 +148,8 @@ gre_rules_up() {
     local dev="${TUN[IFNAME]}" wan net
     net="$(ipam_network "${TUN[IPAM_INDEX]}")/30"
 
-    if [[ "${TUN[ENABLE_NAT]:-no}" == yes || -n "${TUN[FORWARDS]:-}" ]]; then
+    if [[ "${TUN[ENABLE_NAT]:-no}" == yes || -n "${TUN[FORWARDS]:-}" \
+          || "${TUN[FORWARD_MODE]:-none}" != none ]]; then
         sysctl -qw net.ipv4.ip_forward=1 || true
     fi
 
@@ -143,6 +161,8 @@ gre_rules_up() {
     fi
 
     gre_forwards_apply ensure
+    [[ "${TUN[FORWARD_MODE]:-none}" == all ]] && gre_relay_all ensure
+    return 0
 }
 
 gre_rules_down() {
@@ -153,6 +173,32 @@ gre_rules_down() {
     _ipt_remove filter FORWARD -i "$dev" -o "$wan" -j ACCEPT
     _ipt_remove filter FORWARD -i "$wan" -o "$dev" -m state --state RELATED,ESTABLISHED -j ACCEPT
     gre_forwards_apply remove
+    gre_relay_all remove
+    return 0
+}
+
+# gre_relay_all ensure|remove — relay ALL client ports arriving on the WAN to
+# the peer's inner IP, except a protected set (SSH etc.). Iran-side only.
+gre_relay_all() {
+    local action="$1" dev="${TUN[IFNAME]}" wan p
+    local fn=_ipt_ensure; [[ "$action" == remove ]] && fn=_ipt_remove
+    wan="$(detect_wan_iface)"
+    # Keep excepted ports (SSH, local panels) on this host — RETURN before DNAT.
+    local IFS=','
+    for p in ${TUN[FORWARD_EXCEPT]:-22}; do
+        [[ "$p" =~ ^[0-9]+$ ]] || continue
+        "$fn" nat PREROUTING -i "$wan" -p tcp --dport "$p" -j RETURN
+        "$fn" nat PREROUTING -i "$wan" -p udp --dport "$p" -j RETURN
+    done
+    unset IFS
+    # DNAT everything else arriving on the WAN to the peer inner IP.
+    "$fn" nat PREROUTING -i "$wan" -p tcp -j DNAT --to-destination "${TUN[INNER_REMOTE]}"
+    "$fn" nat PREROUTING -i "$wan" -p udp -j DNAT --to-destination "${TUN[INNER_REMOTE]}"
+    # SNAT so the peer's replies come back through the tunnel.
+    "$fn" nat POSTROUTING -o "$dev" -j SNAT --to-source "${TUN[INNER_LOCAL]}"
+    # Permit the forwarding both ways.
+    "$fn" filter FORWARD -o "$dev" -j ACCEPT
+    "$fn" filter FORWARD -i "$dev" -j ACCEPT
 }
 
 # gre_forwards_apply ensure|remove — DNAT/SNAT rules for TUN[FORWARDS].
@@ -234,7 +280,10 @@ gre_status() {
     ui_kv "Inner"        "${TUN[INNER_LOCAL]} <-> ${TUN[INNER_REMOTE]} /${TUN[INNER_CIDR]:-30}"
     ui_kv "MTU"          "${TUN[MTU]}"
     ui_kv "NAT"          "${TUN[ENABLE_NAT]:-no}"
-    [[ -n "${TUN[FORWARDS]:-}" ]] && ui_kv "Forwards" "${TUN[FORWARDS]}"
+    case "${TUN[FORWARD_MODE]:-none}" in
+        all)   ui_kv "Forwarding" "ALL ports → ${TUN[INNER_REMOTE]} (except: ${TUN[FORWARD_EXCEPT]:-22})" ;;
+        ports) ui_kv "Forwarding" "ports: ${TUN[FORWARDS]}" ;;
+    esac
     if [[ -d "/sys/class/net/$dev" ]]; then
         local rx tx; read -r rx tx <<<"$(gre_sample "${TUN[NAME]}")"
         ui_kv "Link"     "$(status_dot up) present  RX $(human_bytes "$rx")  TX $(human_bytes "$tx")"
