@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.8.1] - 2026-07-11
+
+### Fixed
+- **WaterWall service failed to start (status=200/CHDIR).** systemd applied
+  `WorkingDirectory` before `ExecStartPre` could create it, so the service never
+  started. Removed `WorkingDirectory`; `ExecStart` now `cd`s into the prepared
+  directory itself.
+
 ## [1.8.0] - 2026-07-11
 
 ### Added

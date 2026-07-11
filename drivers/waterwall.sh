@@ -152,9 +152,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=$(ww_dir "${TUN[NAME]}")
+# Do NOT use WorkingDirectory here: systemd applies it BEFORE ExecStartPre, but
+# ExecStartPre (__up) is what creates this directory. Instead cd inside ExecStart
+# after the directory and binary have been prepared.
 ExecStartPre=${TM_CTL} __up ${TUN[NAME]}
-ExecStart=$(ww_bin)
+ExecStart=/usr/bin/env bash -c 'cd "$(ww_dir "${TUN[NAME]}")" && exec "$(ww_bin)"'
 Restart=always
 RestartSec=5
 LimitNOFILE=1048576
