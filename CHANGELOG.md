@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.8.0] - 2026-07-11
+
+### Added
+- **WaterWall transport driver (7th protocol).** radkesvat/WaterWall — a C++
+  network core configured as a node graph. The driver generates a proven simple
+  reverse-tunnel profile (TcpListener → XOR Obfuscator → TcpConnector) that masks
+  the stream against DPI. Auto binary download (old-cpu build by default for max
+  VPS compatibility), core.json + config.json, systemd with WorkingDirectory.
+
+### Notes
+- Seven selectable protocols now ship: **GRE, Paqet, Backhaul, Rathole, GOST,
+  FRP, WaterWall.** (ReverseTlsTunnel is merged upstream into WaterWall.)
+
 ## [1.7.0] - 2026-07-11
 
 ### Added
