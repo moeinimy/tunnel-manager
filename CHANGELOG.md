@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.8.2] - 2026-07-11
+
+### Fixed
+- **Critical: `update` rendered per-tunnel units with the temp extraction path.**
+  During `install.sh --update`, `TM_BIN_DIR` kept its value from the temporary
+  source tree, so every userspace tunnel's `ExecStart` pointed at
+  `/tmp/…/bin/<binary>` and failed (status 127) on the next restart/reboot.
+  `TM_BIN_DIR` is now unset and recomputed to `/opt/tunnel-manager/bin`. Re-run
+  `tunnelctl update` on each server to repair existing units.
+
 ## [1.8.1] - 2026-07-11
 
 ### Fixed

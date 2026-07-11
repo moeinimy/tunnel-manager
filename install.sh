@@ -67,8 +67,12 @@ chmod +x "$INSTALL_DIR/tunnelctl" "$INSTALL_DIR"/*.sh 2>/dev/null || true
 ln -sf "$INSTALL_DIR/tunnelctl" "$BIN_LINK"
 
 # Switch runtime paths to the installed location and load the libs needed for
-# the update-mode re-install loop below.
+# the update-mode re-install loop below. TM_BIN_DIR was already resolved from
+# the (temporary) source TM_HOME when common.sh was first sourced, so it MUST be
+# unset here — otherwise generated units would point ExecStart at the temp
+# extraction dir and break on the next restart.
 TM_HOME="$INSTALL_DIR"; export TM_HOME
+unset TM_BIN_DIR
 for _lib in lib/common.sh lib/validate.sh lib/config.sh lib/ipam.sh \
             lib/systemd.sh drivers/driver.sh drivers/gre.sh drivers/paqet.sh \
             drivers/backhaul.sh drivers/rathole.sh drivers/gost.sh drivers/frp.sh \
