@@ -77,16 +77,16 @@ waterwall_wizard() {
     TUN[WW_ROLE]="$role"
 
     ask_valid TUN[WW_PORT] "Tunnel port (server listens / client connects)" is_port 8443
-    # Real encryption (chacha20-poly1305) is ON by default: it masks the tunnel
-    # link from DPI and forwards reliably (like GOST mtls). Turn it off only for a
-    # plain transparent tunnel riding on another encrypted path.
-    TUN[WW_ENCRYPT]=yes
-    if confirm "Encrypt the tunnel link? (recommended)" yes; then
+    # Transparent by default: a plain TcpListener->TcpConnector tunnel (like the
+    # other userspace drivers) that carries xray/Reality reliably — Reality
+    # already camouflages itself. The EncryptionClient/Server node is offered but
+    # is EXPERIMENTAL: on v1.46.3 it establishes the link yet corrupts the stream
+    # here, so keep it off for xray.
+    TUN[WW_ENCRYPT]=no; TUN[WW_PASSWORD]=""
+    if confirm "Add WaterWall XChaCha encryption? (EXPERIMENTAL — leave OFF for xray)" no; then
         TUN[WW_ENCRYPT]=yes
         ask TUN[WW_PASSWORD] "Encryption password (blank = auto; MUST match the other side)" ""
         [[ -n "${TUN[WW_PASSWORD]}" ]] || TUN[WW_PASSWORD]="$(gen_secret 24)"
-    else
-        TUN[WW_ENCRYPT]=no
     fi
 
     if [[ "$role" == client ]]; then
