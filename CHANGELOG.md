@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] - 2026-07-11
+
+### Added
+- **Rathole transport driver (4th protocol).** rapiz1/rathole — a lightweight,
+  fast Rust reverse tunnel. Auto binary download (zip), TOML config, systemd.
+  Service names are derived from the public port so both ends match
+  deterministically. Adds `unzip` as a dependency.
+
 ## [1.4.0] - 2026-07-11
 
 ### Added

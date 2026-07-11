@@ -24,7 +24,7 @@ export TM_HOME
 for _f in \
     lib/common.sh lib/validate.sh lib/ui.sh lib/config.sh lib/ipam.sh \
     lib/state.sh lib/systemd.sh lib/deps.sh \
-    drivers/driver.sh drivers/gre.sh drivers/paqet.sh drivers/backhaul.sh \
+    drivers/driver.sh drivers/gre.sh drivers/paqet.sh drivers/backhaul.sh drivers/rathole.sh \
     modules/telegram.sh modules/tunnel.sh modules/optimize.sh \
     modules/monitor.sh modules/report.sh modules/backup.sh modules/selfupdate.sh \
     modules/peer.sh lib/menu.sh ; do
