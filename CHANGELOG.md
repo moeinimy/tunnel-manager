@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.8.3] - 2026-07-11
+
+### Changed
+- **WaterWall XOR obfuscation is now optional and OFF by default.** The default
+  is a transparent TcpListener→TcpConnector tunnel, which carries xray/Reality
+  reliably (Reality already camouflages itself; the XOR obfuscator was dropping
+  those connections). Enable XOR only for plain, non-camouflaged traffic.
+
 ## [1.8.2] - 2026-07-11
 
 ### Fixed

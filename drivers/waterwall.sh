@@ -77,7 +77,14 @@ waterwall_wizard() {
     TUN[WW_ROLE]="$role"
 
     ask_valid TUN[WW_PORT] "Tunnel port (server listens / client connects)" is_port 8443
-    ask_valid TUN[WW_KEY]  "Obfuscation XOR key 1-255 (MUST match the other side)" _ww_is_key "$(( (RANDOM % 254) + 1 ))"
+    # Obfuscation is OFF by default: xray/VLESS-Reality already camouflages itself,
+    # so a transparent tunnel is the reliable choice. Enable XOR only for carrying
+    # non-camouflaged (plain) traffic.
+    TUN[WW_OBFUSCATE]=no; TUN[WW_KEY]=0
+    if confirm "Add XOR obfuscation? (leave OFF for xray/Reality — it self-camouflages)" no; then
+        TUN[WW_OBFUSCATE]=yes
+        ask_valid TUN[WW_KEY] "Obfuscation XOR key 1-255 (MUST match the other side)" _ww_is_key "$(( (RANDOM % 254) + 1 ))"
+    fi
 
     if [[ "$role" == client ]]; then
         ask_valid TUN[REMOTE_IP] "Server (foreign) public IP" is_ipv4
@@ -91,7 +98,9 @@ _ww_is_key() { [[ "$1" =~ ^[0-9]+$ ]] && (( $1 >= 1 && $1 <= 255 )); }
 
 waterwall_validate() {
     is_port "${TUN[WW_PORT]:-}" || { log_error "invalid tunnel port"; return 1; }
-    _ww_is_key "${TUN[WW_KEY]:-}" || { log_error "XOR key must be 1-255"; return 1; }
+    if [[ "${TUN[WW_OBFUSCATE]:-no}" == yes ]]; then
+        _ww_is_key "${TUN[WW_KEY]:-}" || { log_error "XOR key must be 1-255"; return 1; }
+    fi
     if [[ "${TUN[WW_ROLE]}" == client ]]; then
         is_ipv4 "${TUN[REMOTE_IP]:-}" || { log_error "invalid server IP"; return 1; }
         is_port "${TUN[WW_USER_PORT]:-}" || { log_error "invalid user port"; return 1; }
@@ -106,29 +115,32 @@ ww_generate_config() {
     mkdir -p "$dir/log"
     printf '{ "configs": ["config.json"] }\n' >"$dir/core.json"
     local cfg="$dir/config.json" tmp; tmp="$(mktemp)"
+
+    # Build the listener + optional obfuscator + connector chain.
+    local in_addr in_port out_addr out_port name obf_type in_next="out" obf_node=""
     if [[ "${TUN[WW_ROLE]}" == client ]]; then
-        cat >"$tmp" <<EOF
-{
-  "name": "${TUN[NAME]}-client",
-  "nodes": [
-    { "name": "in",  "type": "TcpListener",      "settings": { "address": "0.0.0.0", "port": ${TUN[WW_USER_PORT]}, "nodelay": true }, "next": "obf" },
-    { "name": "obf", "type": "ObfuscatorClient",  "settings": { "method": "xor", "xor_key": ${TUN[WW_KEY]}, "skip": "none", "tls_record_header": false }, "next": "out" },
-    { "name": "out", "type": "TcpConnector",      "settings": { "address": "${TUN[REMOTE_IP]}", "port": ${TUN[WW_PORT]}, "nodelay": true } }
-  ]
-}
-EOF
+        name="${TUN[NAME]}-client"; obf_type="ObfuscatorClient"
+        in_addr="0.0.0.0";   in_port="${TUN[WW_USER_PORT]}"
+        out_addr="${TUN[REMOTE_IP]}"; out_port="${TUN[WW_PORT]}"
     else
-        cat >"$tmp" <<EOF
+        name="${TUN[NAME]}-server"; obf_type="ObfuscatorServer"
+        in_addr="0.0.0.0";   in_port="${TUN[WW_PORT]}"
+        out_addr="127.0.0.1"; out_port="${TUN[WW_TARGET_PORT]}"
+    fi
+    if [[ "${TUN[WW_OBFUSCATE]:-no}" == yes ]]; then
+        in_next="obf"
+        obf_node="    { \"name\": \"obf\", \"type\": \"${obf_type}\", \"settings\": { \"method\": \"xor\", \"xor_key\": ${TUN[WW_KEY]}, \"skip\": \"none\", \"tls_record_header\": false }, \"next\": \"out\" },
+"
+    fi
+    cat >"$tmp" <<EOF
 {
-  "name": "${TUN[NAME]}-server",
+  "name": "${name}",
   "nodes": [
-    { "name": "in",  "type": "TcpListener",      "settings": { "address": "0.0.0.0", "port": ${TUN[WW_PORT]}, "nodelay": true }, "next": "obf" },
-    { "name": "obf", "type": "ObfuscatorServer",  "settings": { "method": "xor", "xor_key": ${TUN[WW_KEY]}, "skip": "none", "tls_record_header": false }, "next": "out" },
-    { "name": "out", "type": "TcpConnector",      "settings": { "address": "127.0.0.1", "port": ${TUN[WW_TARGET_PORT]}, "nodelay": true } }
+    { "name": "in",  "type": "TcpListener",  "settings": { "address": "${in_addr}", "port": ${in_port}, "nodelay": true }, "next": "${in_next}" },
+${obf_node}    { "name": "out", "type": "TcpConnector", "settings": { "address": "${out_addr}", "port": ${out_port}, "nodelay": true } }
   ]
 }
 EOF
-    fi
     chmod 600 "$tmp"; mv -f "$tmp" "$cfg"
     log_debug "wrote waterwall config $cfg"
 }
@@ -171,7 +183,7 @@ waterwall_sample() { printf '0 0'; }
 
 waterwall_status() {
     ui_kv "Role"      "${TUN[WW_ROLE]}"
-    ui_kv "Obfuscator" "xor key=${TUN[WW_KEY]}"
+    if [[ "${TUN[WW_OBFUSCATE]:-no}" == yes ]]; then ui_kv "Obfuscator" "xor key=${TUN[WW_KEY]}"; else ui_kv "Obfuscator" "off (transparent)"; fi
     if [[ "${TUN[WW_ROLE]}" == client ]]; then
         ui_kv "Listen"  "0.0.0.0:${TUN[WW_USER_PORT]} → ${TUN[REMOTE_IP]}:${TUN[WW_PORT]}"
     else
