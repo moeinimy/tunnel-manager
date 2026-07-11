@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.7.0] - 2026-07-11
+
+### Added
+- **FRP transport driver (6th protocol).** fatedier/frp — a mature reverse proxy.
+  Installs both frps/frpc, generates TOML config with `transport.tls.enable`,
+  and runs the right binary per role (server=frps on Iran exposing ports,
+  client=frpc on foreign mapping them to local services). TLS on by default.
+
 ## [1.6.1] - 2026-07-11
 
 ### Changed
