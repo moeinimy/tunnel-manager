@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-07-11
+
+### Added
+- **Interactive Telegram bot with inline (glass) buttons.** `/menu` opens a
+  button panel: Status, System, Bandwidth, Tunnels, Restart (per-tunnel picker),
+  Report, Peers, Reboot (with confirm). Buttons and typed commands share one
+  handler.
+- **Multi-server control (peers).** Register another server (e.g. the Iran box,
+  reachable over the tunnel's inner IP) with `tunnelctl peer add`; the foreign
+  bot/CLI can then view it — solving the "Iran can't reach Telegram" problem.
+  Uses a dedicated SSH key over the private tunnel link.
+- **`tunnelctl bandwidth`** — per-tunnel traffic table (current rate, totals),
+  also available in the menu and via the bot.
+- Telegram `/bandwidth`, `/traffic`, `/peers`, `/menu` commands.
+
+### Improved
+- **Network optimization is much more thorough**: ~40 tuned sysctl keys (TCP
+  keepalive/timeouts, window scaling, SACK, conntrack table size, local port
+  range, swappiness, IPv6 forwarding, netdev budget…) plus reversible NIC tuning
+  (tx queue length and NIC ring buffers). All still fully reverted by
+  `optimize revert`.
+
 ## [1.0.7] - 2026-07-11
 
 ### Added

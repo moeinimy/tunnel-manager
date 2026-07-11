@@ -233,6 +233,21 @@ tunnel_overview() {
     done
 }
 
+# tunnel_bandwidth — per-tunnel traffic table (current rate, peak, totals).
+tunnel_bandwidth() {
+    local -a t; mapfile -t t < <(list_tunnels)
+    ui_title "Bandwidth"
+    if [[ ${#t[@]} -eq 0 ]]; then printf '  %sNo tunnels.%s\n' "$C_DIM" "$C_RESET"; return 0; fi
+    printf '  %s%-14s %-11s %-11s %-11s %-11s%s\n' "$C_BOLD" "NAME" "↓ now/s" "↑ now/s" "↓ total" "↑ total" "$C_RESET"
+    local n
+    for n in "${t[@]}"; do
+        state_load "$n"
+        printf '  %-14s %-11s %-11s %-11s %-11s\n' "$n" \
+            "$(human_bytes "${ST[RX_RATE]:-0}")" "$(human_bytes "${ST[TX_RATE]:-0}")" \
+            "$(human_bytes "${ST[RX_BYTES]:-0}")" "$(human_bytes "${ST[TX_BYTES]:-0}")"
+    done
+}
+
 # tunnel_logs NAME — recent journal for the tunnel's unit.
 tunnel_logs() {
     local name="${1:-}"; [[ -n "$name" ]] || { pick_tunnel name || return 0; }

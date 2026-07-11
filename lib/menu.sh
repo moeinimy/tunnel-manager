@@ -32,6 +32,8 @@ menu_main() {
             15) menu_reports ;;
             16) selfupdate_run ;;
             17) menu_uninstall ;;
+            18) tunnel_bandwidth ;;
+            19) menu_peers ;;
             0|q|Q) printf 'Bye.\n'; break ;;
             *)  log_warn "Invalid option." ;;
         esac
@@ -51,10 +53,24 @@ ${C_BOLD}${C_CYAN}Tunnels${C_RESET}                  ${C_BOLD}${C_CYAN}System${C
   ${C_GREEN}5${C_RESET}) Stop tunnel            ${C_GREEN}15${C_RESET}) Reports
   ${C_GREEN}6${C_RESET}) Restart tunnel         ${C_GREEN}16${C_RESET}) Update
   ${C_GREEN}7${C_RESET}) Enable auto-start      ${C_GREEN}17${C_RESET}) Uninstall
-  ${C_GREEN}8${C_RESET}) Disable auto-start
-  ${C_GREEN}9${C_RESET}) View status            ${C_GREEN}0${C_RESET}) Quit
+  ${C_GREEN}8${C_RESET}) Disable auto-start     ${C_GREEN}18${C_RESET}) Bandwidth / traffic
+  ${C_GREEN}9${C_RESET}) View status            ${C_GREEN}19${C_RESET}) Peers (multi-server)
  ${C_GREEN}10${C_RESET}) View logs
+                                  ${C_GREEN}0${C_RESET}) Quit
 EOF
+}
+
+menu_peers() {
+    local c
+    ask_menu c "Peers (control other servers over the tunnel)" \
+        "List / status" "Add peer" "Remove peer" "Show my public key" "Back"
+    case "$c" in
+        "List / status") peer_overview ;;
+        "Add peer")      peer_add ;;
+        "Remove peer")   peer_remove ;;
+        "Show my public key") peer_key_ensure && printf '\n%s\n' "$(peer_pubkey)" ;;
+        *) : ;;
+    esac
 }
 
 menu_optimize() {
