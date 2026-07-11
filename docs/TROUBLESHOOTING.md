@@ -21,11 +21,26 @@ systemd-detect-virt                # openvz / lxc → use Paqet instead
 ```
 Switch that tunnel to **Paqet**.
 
-**Interface is up but peer is unreachable (ping fails)**
+**`ping` to the inner IP fails, but the tunnel actually works**
+This is common on Iran paths: **ICMP inside GRE is often filtered while TCP
+passes fine.** Don't judge a GRE tunnel by `ping`. Test with TCP instead:
+```bash
+# on the foreign side, listen on its inner IP
+python3 -m http.server 8080 --bind 10.20.0.5
+# from the Iran side
+curl -v --max-time 10 http://10.20.0.5:8080/
+```
+If curl connects, the tunnel is healthy. Tunnel Manager's monitor already falls
+back to a TCP probe, so `tunnelctl status` reports reachability correctly (look
+for `(tcp probe)`), even when ICMP is dropped.
+
+**Interface is up but even TCP through the tunnel fails**
 - GRE uses IP protocol 47 — make sure your provider/firewall allows it both ways.
 - Check both ends have the *mirror* config (Iran `remote` = foreign public IP and
   vice-versa) and the **same GRE key** if you set one.
 - Verify the inner addresses are the expected `/30` pair (`tunnelctl status`).
+- Make sure no leftover GRE tunnel from another script shares the same endpoints
+  (a second keyless GRE between the same IPs collides): `ip -d link show | grep gre`.
 
 **Traffic doesn't route through the tunnel**
 - On the foreign side enable NAT (re-run `edit`, or recreate with NAT = yes).

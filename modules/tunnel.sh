@@ -210,7 +210,7 @@ tunnel_status() {
     if [[ -n "$up_since" && "$active" == up ]]; then
         ui_kv "Uptime"  "$(human_duration "$(( $(date +%s) - up_since ))")"
     fi
-    [[ -n "${ST[LATENCY_MS]:-}" ]] && ui_kv "Latency"  "${ST[LATENCY_MS]} ms   loss: ${ST[LOSS_PCT]:-?}%"
+    [[ -n "${ST[LATENCY_MS]:-}" ]] && ui_kv "Reachability" "${ST[LATENCY_MS]} ms  loss ${ST[LOSS_PCT]:-?}%  (${ST[PROBE]:-icmp} probe)"
     [[ -n "${ST[RX_RATE]:-}" ]]    && ui_kv "Rate"     "↓ $(human_bytes "${ST[RX_RATE]:-0}")/s   ↑ $(human_bytes "${ST[TX_RATE]:-0}")/s"
     [[ -n "${ST[RX_BYTES]:-}" ]]   && ui_kv "Total"    "↓ $(human_bytes "${ST[RX_BYTES]:-0}")   ↑ $(human_bytes "${ST[TX_BYTES]:-0}")"
 }

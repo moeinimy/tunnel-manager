@@ -90,7 +90,10 @@ monitor_tunnel() {
     state_save "$name"
 }
 
-# monitor_probe_latency NAME — 3-packet ping to record latency/loss in state.
+# monitor_probe_latency NAME — record reachability latency/loss into state.
+# ICMP is tried first, but many Iran transit paths drop ICMP *inside* GRE while
+# passing TCP fine, so we fall back to a TCP round-trip probe. A closed port
+# that answers with RST still proves the tunnel carries traffic.
 monitor_probe_latency() {
     local name="$1" target dev out
     if [[ "${TUN[PROTOCOL]}" == gre ]]; then
@@ -99,14 +102,45 @@ monitor_probe_latency() {
         target="${TUN[REMOTE_IP]}"; dev=""
     fi
     [[ -n "$target" && "$target" != 0.0.0.0 ]] || return 0
-    local -a pcmd=(ping -c3 -W2 -q)
+
+    # 1) ICMP attempt.
+    local -a pcmd=(ping -c2 -W2 -q)
     [[ -n "$dev" && -d "/sys/class/net/$dev" ]] && pcmd+=(-I "$dev")
     out="$("${pcmd[@]}" "$target" 2>/dev/null)" || true
     local loss avg
     loss="$(printf '%s' "$out" | grep -oP '\d+(?=% packet loss)' | head -1)"
-    avg="$(printf '%s' "$out"  | grep -oP 'rtt[^=]*= [0-9.]+/\K[0-9.]+' | head -1)"
-    ST[LOSS_PCT]="${loss:-100}"
-    ST[LATENCY_MS]="${avg:-0}"
+    avg="$(printf '%s'  "$out" | grep -oP 'rtt[^=]*= [0-9.]+/\K[0-9.]+' | head -1)"
+
+    if [[ -n "$loss" && "$loss" != 100 ]]; then
+        ST[LOSS_PCT]="$loss"; ST[LATENCY_MS]="${avg:-0}"; ST[PROBE]="icmp"
+        return 0
+    fi
+
+    # 2) ICMP failed/filtered — try a TCP round-trip (the real signal).
+    local ms
+    if ms="$(tcp_rtt "$target")"; then
+        ST[LOSS_PCT]=0; ST[LATENCY_MS]="$ms"; ST[PROBE]="tcp"
+    else
+        ST[LOSS_PCT]=100; ST[LATENCY_MS]="${avg:-0}"; ST[PROBE]="none"
+    fi
+}
+
+# tcp_rtt HOST — probe a few ports; print round-trip ms and return 0 if the host
+# answers (SYN-ACK or RST) within the timeout. Uses bash /dev/tcp, no extra deps.
+tcp_rtt() {
+    local host="$1" port rc t0 t1 ms
+    for port in 22 80 443 53; do
+        t0=$(date +%s%N)
+        timeout 2 bash -c "exec 3<>/dev/tcp/$host/$port" 2>/dev/null; rc=$?
+        t1=$(date +%s%N)
+        ms=$(( (t1 - t0) / 1000000 ))
+        # rc==0: connected. rc!=0 but fast: connection refused (RST) => reachable.
+        # Only a full ~2000ms stall means the packet got no answer at all.
+        if [[ $rc -eq 0 ]] || (( ms < 1500 )); then
+            printf '%s' "$ms"; return 0
+        fi
+    done
+    return 1
 }
 
 # monitor_system — CPU/RAM/disk sampling with cooldown-limited alerts.

@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.6] - 2026-07-11
+
+### Fixed
+- **Reachability probe no longer reports false 100% loss for GRE.** Many Iran
+  transit paths drop ICMP *inside* GRE while carrying TCP normally, so `ping`
+  wrongly showed a healthy tunnel as down. The monitor now falls back to a TCP
+  round-trip probe (a RST from a closed port still proves connectivity) and
+  `status` shows which probe was used (`icmp`/`tcp`).
+
 ## [1.0.5] - 2026-07-11
 
 ### Changed
