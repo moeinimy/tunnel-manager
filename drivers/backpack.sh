@@ -97,12 +97,25 @@ backpack_wizard() {
         wssmux wsmux wss ws tcpmux tcp
     ask_valid TUN[BP_PORT] "Tunnel port (control connection)" is_port 8443
     ask TUN[BP_TOKEN] "Shared token (blank = auto; MUST match the other side)" ""
-    [[ -n "${TUN[BP_TOKEN]}" ]] || TUN[BP_TOKEN]="$(gen_secret 32)"
+    if [[ -z "${TUN[BP_TOKEN]}" ]]; then
+        TUN[BP_TOKEN]="$(gen_secret 32)"
+        log_ok "Generated token: ${TUN[BP_TOKEN]}"
+        log_info "→ Use this SAME token when adding this tunnel on the other server."
+    fi
 
     local def_local; def_local="$(detect_local_ip)"
     ask_valid TUN[LOCAL_IP] "This server's IP" is_ipv4 "$def_local"
 
     if [[ "$role" == server ]]; then
+        # The tunnel itself doesn't need the client's address (the client dials
+        # in), but the multi-server bot/peer control does: it authorises and
+        # firewalls the agent port by the peer's public IP. Collect it here so
+        # peer control works in BOTH directions (blank = skip peer control).
+        ask TUN[REMOTE_IP] "Other (foreign/client) server's public IP — enables bot/peer control (blank to skip)" ""
+        if [[ -n "${TUN[REMOTE_IP]}" ]] && ! is_ipv4 "${TUN[REMOTE_IP]}"; then
+            log_warn "Not a valid IPv4 — skipping peer control for this tunnel."
+            TUN[REMOTE_IP]=""
+        fi
         TUN[BP_PORTS]=""
         log_info "Define which ports users hit here, and where they go on the client side."
         backpack_wizard_ports
@@ -260,6 +273,7 @@ backpack_status() {
     ui_kv "Transport" "${TUN[BP_TRANSPORT]}"
     if [[ "${TUN[BP_ROLE]}" == server ]]; then
         ui_kv "Listen"  "0.0.0.0:${TUN[BP_PORT]}   maps: ${TUN[BP_PORTS]}"
+        [[ -n "${TUN[REMOTE_IP]:-}" ]] && ui_kv "Peer (bot)" "${TUN[REMOTE_IP]}"
     else
         ui_kv "Server"  "${TUN[REMOTE_IP]}:${TUN[BP_PORT]}"
         [[ -n "${TUN[BP_EDGE]:-}" ]] && ui_kv "Edge IP" "${TUN[BP_EDGE]}"

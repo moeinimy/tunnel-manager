@@ -5,6 +5,20 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/).
 
 
+## [2.1.1] - 2026-07-16
+
+### Fixed (BackPack, from first live test on the servers)
+- **Auto-generated token is now printed** during the wizard (`Generated token:
+  …`) so it can be copied to the other server. Previously a blank-token entry
+  produced a secret the user couldn't see.
+- **Bot/peer control now works from the server (Iran) side.** The server role
+  now optionally collects the other server's public IP (used only to authorise
+  and firewall the peer-agent port 8271 — not written into the tunnel config),
+  so the Telegram bot on the foreign box can reach the Iran peer instead of
+  getting `(peer unreachable)`. Peer control is now symmetric. The same
+  server-side gap exists for the other userspace drivers (backhaul/gost/frp/
+  rathole) and can be retrofitted the same way.
+
 ## [2.1.0] - 2026-07-15
 
 ### Added
