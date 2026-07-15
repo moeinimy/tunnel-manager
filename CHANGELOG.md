@@ -5,6 +5,20 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/).
 
 
+## [2.1.2] - 2026-07-16
+
+### Changed
+- **Automatic bot/peer control for ALL userspace protocols** (backhaul, backpack,
+  gost, frp, rathole, paqet) — not just BackPack. The generic add flow now asks
+  once for the other server's public IP on any non-GRE tunnel whose side doesn't
+  already know it (empty or `0.0.0.0` REMOTE_IP). Giving the IP is the only step;
+  the peer agent is authorised and firewalled automatically. The BackPack-specific
+  prompt added in 2.1.1 was removed in favour of this shared path.
+- **Retrofit existing tunnels:** `tunnelctl edit <name>` now offers **"Set peer IP
+  for bot control"** for server-side userspace tunnels that lack a peer IP, and
+  re-applies the agent firewall on any edit. So already-created tunnels gain
+  automatic peer control by just supplying the IP — no remove/re-add needed.
+
 ## [2.1.1] - 2026-07-16
 
 ### Fixed (BackPack, from first live test on the servers)

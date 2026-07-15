@@ -41,6 +41,21 @@ tunnel_add() {
     # Protocol-specific questions populate the rest of TUN.
     driver_wizard || { log_error "wizard aborted"; return 1; }
 
+    # Generic bot/peer control (all userspace protocols). The client side of a
+    # reverse tunnel already knows the server's public IP (REMOTE_IP); the server
+    # side does not, because the client dials in — so its peer agent can't
+    # authorise/firewall the incoming peer. Ask once here for ANY non-GRE tunnel
+    # that has no REMOTE_IP yet, so simply giving the IP is all that's needed for
+    # automatic peer control — no per-driver setup, works for every protocol.
+    if [[ "$proto" != gre && ( -z "${TUN[REMOTE_IP]:-}" || "${TUN[REMOTE_IP]}" == 0.0.0.0 ) ]]; then
+        local peer_ip=""
+        ask peer_ip "Other server's public IP — enables automatic bot/peer control (blank to skip)" ""
+        if [[ -n "$peer_ip" ]]; then
+            if is_ipv4 "$peer_ip"; then TUN[REMOTE_IP]="$peer_ip"
+            else log_warn "Not a valid IPv4 — skipping peer control for this tunnel."; fi
+        fi
+    fi
+
     if ! driver_validate; then
         log_error "Validation failed; tunnel not created."
         [[ -n "${TUN[IPAM_INDEX]:-}" ]] && ipam_free "$name"
@@ -128,12 +143,20 @@ tunnel_edit() {
         [[ "$_TM_NOEDIT_KEYS" == *" $k "* ]] && continue
         labels+=("$(_field_label "$k")  =  ${TUN[$k]}")
     done < <(printf '%s\n' "${!TUN[@]}" | sort)
+    # Offer to set the peer IP on server-side userspace tunnels that don't have
+    # one yet (retrofits automatic bot/peer control onto existing tunnels — just
+    # give the IP, nothing else needed).
+    if [[ "${TUN[PROTOCOL]}" != gre && ( -z "${TUN[REMOTE_IP]:-}" || "${TUN[REMOTE_IP]}" == 0.0.0.0 ) ]]; then
+        labels+=("Set peer IP for bot control")
+    fi
     labels+=("Toggle auto-start (now: ${TUN[AUTOSTART]:-no})" "Cancel")
 
     local sel
     ask_menu sel "Edit ${TUN[PROTOCOL]} tunnel '$name' — pick a setting" "${labels[@]}"
     case "$sel" in
         "Cancel") return 0 ;;
+        "Set peer IP for bot control")
+            ask_valid TUN[REMOTE_IP] "Other server's public IP (bot/peer control)" is_ipv4 ;;
         "Toggle auto-start"*)
             if [[ "${TUN[AUTOSTART]:-no}" == yes ]]; then TUN[AUTOSTART]=no; svc_disable "$name"
             else TUN[AUTOSTART]=yes; svc_enable "$name"; fi ;;
@@ -161,6 +184,8 @@ tunnel_edit() {
     esac
     save_tunnel
     svc_install "$name"
+    # Refresh the peer agent firewall/authorisation in case REMOTE_IP changed.
+    agent_firewall ensure 2>/dev/null || true
     log_ok "Updated '$name'. Restarting to apply…"
     tunnel_restart "$name"
 }

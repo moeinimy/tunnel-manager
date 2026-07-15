@@ -13,9 +13,13 @@ Continuation notes for a fresh session. Read this first.
   A new session will NOT have that token — ask the user to provide push access again, or have them push. (Tell them to REVOKE the old PAT — it's exposed in chat history.)
 
 ## What works (6 protocols tested with the user's real xray; BackPack code-complete, awaiting live test)
-GRE, Paqet, Backhaul, Rathole, **GOST (mtls)**, FRP. **BackPack** (v2.1.0) is
-built and syntax/dry-run-validated but NOT yet verified on the servers with real
-xray — that's the next gate before it's declared "working". Plus: colorful menu + scriptable CLI, reversible network optimization (auto-applied on install), per-tunnel systemd persistence, GRE relay-all + port forwards, monitor + auto-recovery with TCP-fallback reachability probe, Telegram bot with **inline buttons + persistent keyboard + `/` command menu**, multi-server **auto-peer** (agent over tunnel; GRE inner IP or public REMOTE_IP), **traffic usage over 1h/12h/24h/7d/30d/all**, backup/restore, self-update, universal protocol-aware **Edit Tunnel** (MTU + all ports + secrets).
+GRE, Paqet, Backhaul, Rathole, **GOST (mtls)**, FRP. **BackPack** (added v2.1.0)
+was live-tested on the servers — tunnel carries xray over wssmux. From that test:
+auto-generated token is now printed, and **bot/peer control was generalised to
+all userspace protocols** (v2.1.2): the add flow asks once for the peer's public
+IP on any non-GRE server-side tunnel (empty/0.0.0.0 REMOTE_IP), and `edit` offers
+"Set peer IP for bot control" to retrofit existing tunnels. Peer agent is then
+authorised+firewalled automatically. Plus: colorful menu + scriptable CLI, reversible network optimization (auto-applied on install), per-tunnel systemd persistence, GRE relay-all + port forwards, monitor + auto-recovery with TCP-fallback reachability probe, Telegram bot with **inline buttons + persistent keyboard + `/` command menu**, multi-server **auto-peer** (agent over tunnel; GRE inner IP or public REMOTE_IP), **traffic usage over 1h/12h/24h/7d/30d/all**, backup/restore, self-update, universal protocol-aware **Edit Tunnel** (MTU + all ports + secrets).
 
 ## Architecture — how to add a protocol driver
 A tunnel profile is loaded into the global assoc array `TUN`. Each protocol is a file `drivers/<name>.sh` implementing this contract, with functions named EXACTLY `<name>_<fn>` (the dispatcher calls `${TUN[PROTOCOL]}_<fn>`):

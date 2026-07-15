@@ -107,15 +107,9 @@ backpack_wizard() {
     ask_valid TUN[LOCAL_IP] "This server's IP" is_ipv4 "$def_local"
 
     if [[ "$role" == server ]]; then
-        # The tunnel itself doesn't need the client's address (the client dials
-        # in), but the multi-server bot/peer control does: it authorises and
-        # firewalls the agent port by the peer's public IP. Collect it here so
-        # peer control works in BOTH directions (blank = skip peer control).
-        ask TUN[REMOTE_IP] "Other (foreign/client) server's public IP — enables bot/peer control (blank to skip)" ""
-        if [[ -n "${TUN[REMOTE_IP]}" ]] && ! is_ipv4 "${TUN[REMOTE_IP]}"; then
-            log_warn "Not a valid IPv4 — skipping peer control for this tunnel."
-            TUN[REMOTE_IP]=""
-        fi
+        # NOTE: the server side does not collect the peer's public IP here — the
+        # generic add flow (tunnel_add) asks for it once for every userspace
+        # protocol so bot/peer control works with no per-driver setup.
         TUN[BP_PORTS]=""
         log_info "Define which ports users hit here, and where they go on the client side."
         backpack_wizard_ports
