@@ -8,11 +8,11 @@ ui_banner() {
     cat <<'EOF'
   ╔════════════════════════════════════════════════════════╗
   ║          m o e i n i m y   tunnel manager              ║
-  ║   GRE · Paqet · Backhaul · Rathole · GOST · FRP · WW   ║
+  ║   GRE · Paqet · Backhaul · Rathole · GOST · FRP        ║
   ╚════════════════════════════════════════════════════════╝
 EOF
     printf '%b' "$C_RESET"
-    printf '  %sv%s · 7 protocols · Iran ↔ foreign%s\n' "$C_DIM" "${ver:-?}" "$C_RESET"
+    printf '  %sv%s · 6 protocols · Iran ↔ foreign%s\n' "$C_DIM" "${ver:-?}" "$C_RESET"
 }
 
 # ui_title TEXT — section header line.

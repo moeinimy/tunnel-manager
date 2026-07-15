@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+
+## [2.0.0] - 2026-07-11
+
+### Removed
+- **WaterWall protocol removed.** Its node graph established the link but
+  corrupted the byte stream on v1.46.3 (even transparent), so xray never worked
+  through it despite the other six protocols working on the identical path. Not
+  worth keeping. Six protocols remain: GRE, Paqet, Backhaul, Rathole, GOST, FRP.
+
 ## [1.9.2] - 2026-07-11
 
 ### Added

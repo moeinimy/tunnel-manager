@@ -76,7 +76,7 @@ unset TM_BIN_DIR
 for _lib in lib/common.sh lib/validate.sh lib/config.sh lib/ipam.sh \
             lib/systemd.sh drivers/driver.sh drivers/gre.sh drivers/paqet.sh \
             drivers/backhaul.sh drivers/rathole.sh drivers/gost.sh drivers/frp.sh \
-            drivers/waterwall.sh modules/peer.sh; do
+            modules/peer.sh; do
     # shellcheck source=/dev/null
     . "$INSTALL_DIR/$_lib"
 done
