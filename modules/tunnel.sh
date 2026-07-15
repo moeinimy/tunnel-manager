@@ -27,7 +27,7 @@ tunnel_add() {
         break
     done
 
-    ask_menu proto "Protocol" gre paqet backhaul rathole gost frp
+    ask_menu proto "Protocol" gre paqet backhaul backpack rathole gost frp
     ask_menu role  "Role of THIS server" iran foreign
 
     # Initialise a fresh profile.
@@ -83,6 +83,7 @@ tunnel_remove() {
     driver_down 2>/dev/null || true
     [[ "${TUN[PROTOCOL]}" == paqet ]] && rm -f "$(paqet_cfg "$name")"
     [[ "${TUN[PROTOCOL]}" == backhaul ]] && rm -f "$(backhaul_cfg "$name")"
+    [[ "${TUN[PROTOCOL]}" == backpack ]] && rm -f "$(backpack_cfg "$name")" "$(backpack_cert "$name")" "$(backpack_key "$name")"
     [[ "${TUN[PROTOCOL]}" == rathole ]] && rm -f "$(rathole_cfg "$name")"
     [[ "${TUN[PROTOCOL]}" == gost ]] && rm -f "$(gost_wrapper "$name")"
     [[ "${TUN[PROTOCOL]}" == frp ]] && rm -f "$(frp_cfg "$name")"
@@ -152,6 +153,7 @@ tunnel_edit() {
             case "${TUN[PROTOCOL]}" in
                 paqet) paqet_generate_config ;;
                 backhaul) backhaul_generate_config ;;
+                backpack) backpack_generate_config ;;
                 rathole) rathole_generate_config ;;
                 gost) gost_generate_config ;;
                 frp) frp_generate_config ;;

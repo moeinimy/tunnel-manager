@@ -25,6 +25,8 @@ if [[ -f "$INSTALL_DIR/lib/common.sh" ]]; then
     # shellcheck source=/dev/null
     . "$INSTALL_DIR/drivers/backhaul.sh"
     # shellcheck source=/dev/null
+    . "$INSTALL_DIR/drivers/backpack.sh"
+    # shellcheck source=/dev/null
     . "$INSTALL_DIR/drivers/rathole.sh"
     # shellcheck source=/dev/null
     . "$INSTALL_DIR/drivers/gost.sh"

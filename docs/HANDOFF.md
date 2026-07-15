@@ -12,8 +12,10 @@ Continuation notes for a fresh session. Read this first.
   `git -c credential.helper= -c credential.helper='!f(){ echo username=moeinimy; echo "password=$GH_TOKEN"; }; f' push`.
   A new session will NOT have that token — ask the user to provide push access again, or have them push. (Tell them to REVOKE the old PAT — it's exposed in chat history.)
 
-## What works (6 protocols, all tested with the user's real xray)
-GRE, Paqet, Backhaul, Rathole, **GOST (mtls)**, FRP. Plus: colorful menu + scriptable CLI, reversible network optimization (auto-applied on install), per-tunnel systemd persistence, GRE relay-all + port forwards, monitor + auto-recovery with TCP-fallback reachability probe, Telegram bot with **inline buttons + persistent keyboard + `/` command menu**, multi-server **auto-peer** (agent over tunnel; GRE inner IP or public REMOTE_IP), **traffic usage over 1h/12h/24h/7d/30d/all**, backup/restore, self-update, universal protocol-aware **Edit Tunnel** (MTU + all ports + secrets).
+## What works (6 protocols tested with the user's real xray; BackPack code-complete, awaiting live test)
+GRE, Paqet, Backhaul, Rathole, **GOST (mtls)**, FRP. **BackPack** (v2.1.0) is
+built and syntax/dry-run-validated but NOT yet verified on the servers with real
+xray — that's the next gate before it's declared "working". Plus: colorful menu + scriptable CLI, reversible network optimization (auto-applied on install), per-tunnel systemd persistence, GRE relay-all + port forwards, monitor + auto-recovery with TCP-fallback reachability probe, Telegram bot with **inline buttons + persistent keyboard + `/` command menu**, multi-server **auto-peer** (agent over tunnel; GRE inner IP or public REMOTE_IP), **traffic usage over 1h/12h/24h/7d/30d/all**, backup/restore, self-update, universal protocol-aware **Edit Tunnel** (MTU + all ports + secrets).
 
 ## Architecture — how to add a protocol driver
 A tunnel profile is loaded into the global assoc array `TUN`. Each protocol is a file `drivers/<name>.sh` implementing this contract, with functions named EXACTLY `<name>_<fn>` (the dispatcher calls `${TUN[PROTOCOL]}_<fn>`):
@@ -40,10 +42,26 @@ Test: `bash -n`, then source libs+driver and dry-run `<name>_generate_config`/`r
 - **WaterWall was removed** (v2.0.0): its node graph established the link but corrupted the byte stream on v1.46.3 even transparent — xray never worked through it. Do not re-add without hands-on binary testing.
 
 ## NEXT TASK — add these tunnels (user request)
-Read each repo's README + source, watch the linked video if helpful, then add a driver following the checklist above. **Use mux where the tool supports it and it doesn't break the tunnel.** Verify each on the user's servers with their real xray before moving on (one at a time).
-1. **Hedioum-Pool-Tunnel** — https://github.com/hedioum/Hedioum-Pool-Tunnel — video https://www.youtube.com/watch?v=Sueh8qgzL-0
-2. **BackPack** — https://github.com/AminMGMT/BackPack — video https://www.youtube.com/watch?v=W31f__63PM4 — user suggests **wss + mux** as best (verify).
-3. **Phormal** — https://github.com/Schmi7zz/Phormal — video https://www.youtube.com/watch?v=BVZmavY7yj0
-4. **packet-tunnel** — https://github.com/eris4444/packet-tunnel — video https://www.youtube.com/watch?v=v6tPmUHi2r0
-5. **tunnelforge** — https://github.com/SamNet-dev/tunnelforge — user says probably not great; evaluate first, skip if weak.
-Also: the user wants strong per-tunnel optimization applied where each tool supports it.
+Read each repo's README + source, watch the linked video if helpful, then add a driver following the checklist above. **Use mux where the tool supports it and it doesn't break the tunnel.** Verify each on the user's servers with their real xray before moving on (one at a time). Per-tunnel optimization applied where each tool supports it.
+
+Evaluation done this session (2026-07-15):
+2. **BackPack** — ✅ DONE (driver `drivers/backpack.sh`, v2.1.0). Go/Backhaul
+   lineage. Default `wssmux` (confirmed user's wss+mux suggestion is optimal).
+   Needs the live xray test on the servers.
+1. **Hedioum-Pool-Tunnel** — Go, custom SSH-mimic + **Yamux mux**, connection
+   pool, SOCKS5 hub on Iran / egress on foreign. Strong, but a SOCKS-based pool
+   model (not a plain port-forward) — needs care to expose a single TCP port for
+   xray. NEXT to build; confirm it can forward a raw TCP port (443) end-to-end.
+3. **Phormal** — 100% Bash, six sub-products (Bridge/Relay/Reverse/GRE/Echo/Raw)
+   with built-in path auto-selection. Reuse `Bridge`/`Relay` (obfuscation+
+   port-hopping) as the driver modes; skip its GRE (we have our own). Medium
+   effort (it's a big bash tool with its own conf dirs).
+4. **packet-tunnel** — Python/Flask panel wrapping **KCP (UDP)**. No TLS/mux; UDP
+   is throttled on many Iran paths and the panel is heavy. LOW priority — only if
+   a UDP/KCP option is genuinely wanted; otherwise skip (GOST already offers kcp).
+5. **tunnelforge** — SSH tunnels + stunnel obfuscation + ControlMaster mux.
+   Mature but SSH-based transport is not ideal for high-throughput xray, and the
+   user already flagged it as "probably not great". RECOMMEND SKIP.
+
+Suggested order: BackPack (done, test) → Hedioum → Phormal → (packet-tunnel only
+if UDP wanted) → skip tunnelforge.

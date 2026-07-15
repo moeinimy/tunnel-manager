@@ -13,7 +13,7 @@ pkg_manager() {
 # Map of required commands -> package name (apt names; close enough for dnf/yum).
 # libpcap is only needed for Paqet; ethtool only for NIC tuning.
 TM_REQUIRED_CMDS=(curl jq ip iptables tar gzip awk sed grep)
-TM_OPTIONAL_CMDS=(ethtool ss ping ssh ssh-keygen unzip)
+TM_OPTIONAL_CMDS=(ethtool ss ping ssh ssh-keygen unzip openssl)
 
 # deps_missing — print required commands that are absent.
 deps_missing() {

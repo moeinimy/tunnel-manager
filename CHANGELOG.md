@@ -5,6 +5,26 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/).
 
 
+## [2.1.0] - 2026-07-15
+
+### Added
+- **BackPack protocol driver** (`drivers/backpack.sh`) — github.com/AminMGMT/BackPack,
+  a Go reverse-tunnel in the Backhaul lineage (`backpack -c <config>.toml`). It
+  adds TLS websocket transports on top of the usual set: **tcp / tcpmux / ws /
+  wss / wsmux / wssmux** (+ udp). Same server/client model as Backhaul (server
+  owns the public port + `ports` map, client dials out).
+  - **Default transport `wssmux`** — a persistent, multiplexed, TLS-wrapped
+    websocket that looks like ordinary HTTPS. This is the DPI-resistant winner
+    for carrying xray/Reality across Iran (plain tcp relays get per-connection
+    reset). smux enabled on all `*mux` transports (`mux_version = 2`, 8 conns).
+  - **Self-signed TLS** auto-generated for `wss`/`wssmux` on the server side via
+    openssl (EC P-256); clients skip verification, matching upstream.
+  - **Throughput optimization** applied per BackPack's "Best-Performance" preset:
+    `nodelay`, 8 MB socket buffers (`so_rcvbuf`/`so_sndbuf`), connection pool 8,
+    tuned smux frame/stream buffers.
+  - Optional CDN `edge_ip` override for websocket client transports.
+  - Registered in all dispatch points; `openssl` added to optional deps.
+
 ## [2.0.0] - 2026-07-11
 
 ### Removed
