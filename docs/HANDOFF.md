@@ -52,14 +52,21 @@ Evaluation done this session (2026-07-15):
 2. **BackPack** — ✅ DONE (driver `drivers/backpack.sh`, v2.1.0). Go/Backhaul
    lineage. Default `wssmux` (confirmed user's wss+mux suggestion is optimal).
    Needs the live xray test on the servers.
-1. **Hedioum-Pool-Tunnel** — Go, custom SSH-mimic + **Yamux mux**, connection
-   pool, SOCKS5 hub on Iran / egress on foreign. Strong, but a SOCKS-based pool
-   model (not a plain port-forward) — needs care to expose a single TCP port for
-   xray. NEXT to build; confirm it can forward a raw TCP port (443) end-to-end.
-3. **Phormal** — 100% Bash, six sub-products (Bridge/Relay/Reverse/GRE/Echo/Raw)
-   with built-in path auto-selection. Reuse `Bridge`/`Relay` (obfuscation+
-   port-hopping) as the driver modes; skip its GRE (we have our own). Medium
-   effort (it's a big bash tool with its own conf dirs).
+1. **Hedioum-Pool-Tunnel** — ❌ SKIPPED (2026-07-16). Source review shows it's a
+   **SOCKS5 forward-proxy over a Yamux pool**, not a port-forward: the Iran hub
+   only exposes a SOCKS5 port, and the foreign egress dials the SOCKS-requested
+   destination on the OPEN internet with an SSRF guard that **blocks loopback/
+   private IPs**. It fits "xray/X-UI ON IRAN, exit via foreign" — the OPPOSITE of
+   this project's topology (xray Reality inbound on foreign:443, Iran relays a TCP
+   port). It cannot relay to the foreign's local xray, so it doesn't fit the
+   driver's port-map contract or the real-xray test. User agreed to skip.
+3. **Phormal** — ✅ RESOLVED via Hysteria (2026-07-16). Source review showed
+   Phormal is a 6.4k-line Bash ORCHESTRATOR, not its own protocol: Bridge=gost,
+   Reverse=rathole (both already shipped), Relay=**Hysteria 2** (QUIC) with
+   `tcpForwarding`, Echo/Raw=udp2raw/ssh/socat. Rather than port the wrapper, we
+   added a native **Hysteria 2 driver** (`drivers/hysteria.sh`, v2.2.0) — the
+   valuable QUIC engine, fits the port-forward relay model, code-complete +
+   dry-run validated. Needs the live xray test on the servers.
 4. **packet-tunnel** — Python/Flask panel wrapping **KCP (UDP)**. No TLS/mux; UDP
    is throttled on many Iran paths and the panel is heavy. LOW priority — only if
    a UDP/KCP option is genuinely wanted; otherwise skip (GOST already offers kcp).

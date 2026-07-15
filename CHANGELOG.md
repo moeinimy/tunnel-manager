@@ -5,6 +5,32 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/).
 
 
+## [2.2.0] - 2026-07-16
+
+### Added
+- **Hysteria 2 protocol driver** (`drivers/hysteria.sh`) — github.com/apernet/
+  hysteria, a modern **QUIC/UDP** tunnel with TLS-native handshake (looks like
+  HTTP/3), **Salamander** packet obfuscation, and **Brutal** congestion control
+  that shrugs off packet loss — very effective on Iran's lossy/DPI'd links. This
+  is the "Relay" engine the **Phormal** project is built around; added natively
+  rather than porting Phormal's 6.4k-line shell orchestrator (whose other engines
+  — gost + rathole — this project already ships).
+  - Real **TCP (+UDP) port-forward** via Hysteria's `tcpForwarding`/`udpForwarding`
+    so it fits the xray-on-foreign relay topology: xray client → iran:<listen> →
+    QUIC → foreign → 127.0.0.1:<target> (xray Reality). Foreign = QUIC server,
+    Iran = client that dials out.
+  - Self-signed RSA-2048 TLS on the server (client uses `tls.insecure`); one
+    shared secret used for both `auth` and Salamander obfs (printed on generation).
+  - **Optimization:** QUIC receive windows (8 MB stream / 20 MB conn), Brutal CC
+    target bandwidth (configurable up/down), `fastOpen`, 30s idle / 10s keepalive.
+  - Registered in all dispatch points; reuses the shared auto peer-control flow.
+
+### Note
+- **Hedioum-Pool-Tunnel skipped** — source review showed it's a SOCKS5 forward-
+  proxy over a Yamux pool with an SSRF guard that blocks loopback/private targets;
+  it fits "xray on Iran, exit via foreign", the opposite of this project's relay
+  topology, so it cannot carry the foreign's local xray. See docs/HANDOFF.md.
+
 ## [2.1.2] - 2026-07-16
 
 ### Changed

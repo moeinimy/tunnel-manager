@@ -27,7 +27,7 @@ tunnel_add() {
         break
     done
 
-    ask_menu proto "Protocol" gre paqet backhaul backpack rathole gost frp
+    ask_menu proto "Protocol" gre paqet backhaul backpack rathole gost frp hysteria
     ask_menu role  "Role of THIS server" iran foreign
 
     # Initialise a fresh profile.
@@ -99,6 +99,7 @@ tunnel_remove() {
     [[ "${TUN[PROTOCOL]}" == paqet ]] && rm -f "$(paqet_cfg "$name")"
     [[ "${TUN[PROTOCOL]}" == backhaul ]] && rm -f "$(backhaul_cfg "$name")"
     [[ "${TUN[PROTOCOL]}" == backpack ]] && rm -f "$(backpack_cfg "$name")" "$(backpack_cert "$name")" "$(backpack_key "$name")"
+    [[ "${TUN[PROTOCOL]}" == hysteria ]] && rm -f "$(hysteria_cfg "$name")" "$(hysteria_cert "$name")" "$(hysteria_key "$name")"
     [[ "${TUN[PROTOCOL]}" == rathole ]] && rm -f "$(rathole_cfg "$name")"
     [[ "${TUN[PROTOCOL]}" == gost ]] && rm -f "$(gost_wrapper "$name")"
     [[ "${TUN[PROTOCOL]}" == frp ]] && rm -f "$(frp_cfg "$name")"
@@ -115,7 +116,7 @@ tunnel_remove() {
 # Edit (a focused subset of safely-editable fields)
 # ---------------------------------------------------------------------------
 # Internal profile keys the user should not edit directly.
-_TM_NOEDIT_KEYS=" NAME PROTOCOL ROLE CREATED_AT IPAM_INDEX IFNAME INNER_LOCAL INNER_REMOTE INNER_CIDR PAQET_ROLE BH_ROLE RH_ROLE GO_ROLE FRP_ROLE WW_ROLE GO_USER "
+_TM_NOEDIT_KEYS=" NAME PROTOCOL ROLE CREATED_AT IPAM_INDEX IFNAME INNER_LOCAL INNER_REMOTE INNER_CIDR PAQET_ROLE BH_ROLE BP_ROLE RH_ROLE GO_ROLE FRP_ROLE WW_ROLE HY_ROLE GO_USER "
 
 # _field_label KEY — a friendly hint for known keys (helps identify ports).
 _field_label() {
@@ -177,6 +178,7 @@ tunnel_edit() {
                 paqet) paqet_generate_config ;;
                 backhaul) backhaul_generate_config ;;
                 backpack) backpack_generate_config ;;
+                hysteria) hysteria_generate_config ;;
                 rathole) rathole_generate_config ;;
                 gost) gost_generate_config ;;
                 frp) frp_generate_config ;;
