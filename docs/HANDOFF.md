@@ -65,14 +65,26 @@ Evaluation done this session (2026-07-15):
    Reverse=rathole (both already shipped), Relay=**Hysteria 2** (QUIC) with
    `tcpForwarding`, Echo/Raw=udp2raw/ssh/socat. Rather than port the wrapper, we
    added a native **Hysteria 2 driver** (`drivers/hysteria.sh`, v2.2.0) — the
-   valuable QUIC engine, fits the port-forward relay model, code-complete +
-   dry-run validated. Needs the live xray test on the servers.
-4. **packet-tunnel** — Python/Flask panel wrapping **KCP (UDP)**. No TLS/mux; UDP
-   is throttled on many Iran paths and the panel is heavy. LOW priority — only if
-   a UDP/KCP option is genuinely wanted; otherwise skip (GOST already offers kcp).
-5. **tunnelforge** — SSH tunnels + stunnel obfuscation + ControlMaster mux.
-   Mature but SSH-based transport is not ideal for high-throughput xray, and the
-   user already flagged it as "probably not great". RECOMMEND SKIP.
+   valuable QUIC engine, fits the port-forward relay model. Driver verified
+   CORRECT on the servers (server listens on UDP, client sends valid QUIC initials,
+   secrets match) BUT **the user's foreign provider blocks ALL inbound UDP** —
+   tcpdump on foreign shows 0 packets on udp/8443, udp/9099 AND udp/443 while
+   Iran is confirmed sending 1288-byte QUIC packets out. So Hysteria cannot work
+   on THIS path; it stays in the codebase for any UDP-open foreign server. This
+   also means **any UDP-based tunnel is dead on this path** (see packet-tunnel).
+4. **packet-tunnel** — Python/Flask panel wrapping **KCP (UDP)**. ❌ Effectively
+   DEAD on this user's path: their foreign provider blocks inbound UDP (proven via
+   the Hysteria test), so a UDP/KCP tunnel would fail identically. No TLS/mux,
+   heavy Python panel. SKIP.
+5. **tunnelforge** — SSH tunnels + stunnel + ControlMaster mux. TCP-based so it
+   WOULD connect on this path, but SSH transport is a downgrade vs backpack
+   (wssmux) / gost (mtls) for high-throughput xray, and the user flagged it as
+   "probably not great". RECOMMEND SKIP unless the user specifically wants an SSH
+   fallback.
 
-Suggested order: BackPack (done, test) → Hedioum → Phormal → (packet-tunnel only
-if UDP wanted) → skip tunnelforge.
+Outcome: BackPack ✅ live-tested (TCP/wssmux carries xray). Hysteria ✅ built,
+blocked by provider UDP filtering on this path. Hedioum ❌ wrong topology.
+Phormal ✅ resolved (its engines are gost/rathole/Hysteria — all covered).
+packet-tunnel ❌ UDP-dead here. tunnelforge ⚠ SSH downgrade. The proven, reliable
+performers for this user are the TCP relays: **BackPack (wssmux)** and **GOST
+(mtls)**.
