@@ -53,7 +53,7 @@ tg_send_force() {
 tg_set_commands() {
     [[ -n "${TG_BOT_TOKEN:-}" ]] || return 1
     curl -fsS --max-time 15 --data-urlencode \
-        'commands=[{"command":"menu","description":"Open the button menu"},{"command":"status","description":"Tunnels status"},{"command":"tunnels","description":"Control a tunnel (restart/start/stop…)"},{"command":"bandwidth","description":"Live bandwidth"},{"command":"usage","description":"Traffic usage by period"},{"command":"system","description":"Server system info"},{"command":"peers","description":"Control other servers"},{"command":"report","description":"Daily report"}]' \
+        'commands=[{"command":"menu","description":"Open the button menu"},{"command":"status","description":"Tunnels status"},{"command":"tunnels","description":"Control a tunnel (restart/start/stop…)"},{"command":"bandwidth","description":"Live bandwidth"},{"command":"usage","description":"Traffic usage by period"},{"command":"system","description":"Server system info"},{"command":"peers","description":"Control other servers"},{"command":"report","description":"Daily report"},{"command":"update","description":"Update script (this server + Iran peers)"}]' \
         "${TG_API}/bot${TG_BOT_TOKEN}/setMyCommands" >/dev/null 2>&1
     # The "Menu" button next to the chat opens the command list (no /start needed).
     curl -fsS --max-time 15 --data-urlencode 'menu_button={"type":"commands"}' \
@@ -127,7 +127,7 @@ tg_disable() {
 # Inline keyboards
 # ---------------------------------------------------------------------------
 tg_kb_main() {
-    printf '%s' '{"inline_keyboard":[[{"text":"📊 Status","callback_data":"status"},{"text":"🖥 System","callback_data":"system"}],[{"text":"📈 Bandwidth","callback_data":"bandwidth"},{"text":"📅 Usage","callback_data":"usage"}],[{"text":"🚇 Tunnels","callback_data":"tunnels"},{"text":"🔄 Restart","callback_data":"restart_menu"}],[{"text":"📋 Report","callback_data":"report"},{"text":"🌐 Peers","callback_data":"peers"}],[{"text":"♻️ Reboot","callback_data":"reboot_confirm"}]]}'
+    printf '%s' '{"inline_keyboard":[[{"text":"📊 Status","callback_data":"status"},{"text":"🖥 System","callback_data":"system"}],[{"text":"📈 Bandwidth","callback_data":"bandwidth"},{"text":"📅 Usage","callback_data":"usage"}],[{"text":"🚇 Tunnels","callback_data":"tunnels"},{"text":"🔄 Restart","callback_data":"restart_menu"}],[{"text":"📋 Report","callback_data":"report"},{"text":"🌐 Peers","callback_data":"peers"}],[{"text":"⬆️ Update","callback_data":"update_confirm"},{"text":"♻️ Reboot","callback_data":"reboot_confirm"}]]}'
 }
 
 # tg_kb_tunnels ACTION — one button per tunnel with callback "ACTION:name".
@@ -295,6 +295,7 @@ tg_command() {
         /report)            tg_action report "$chat" ;;
         /peers)             tg_action peers "$chat" ;;
         /reboot)            tg_action reboot_confirm "$chat" ;;
+        /update)            tg_action update_confirm "$chat" ;;
         /logs)              tg_action "logs:$arg" "$chat" ;;
         /restart)
             if [[ -n "$arg" ]]; then tg_action "restart:$arg" "$chat"
@@ -394,8 +395,32 @@ tg_action() {
         reboot_confirm)
             tg_send_kb "♻️ Reboot <b>$(hostname)</b>?" '{"inline_keyboard":[[{"text":"✅ Yes, reboot","callback_data":"reboot_yes"},{"text":"« Cancel","callback_data":"menu"}]]}' "$chat" ;;
         reboot_yes)  tg_send "♻️ Rebooting $(hostname) in 3s…" "$chat"; ( sleep 3; systemctl reboot ) & ;;
+        update_confirm)
+            tg_send_kb "⬆️ Update <b>$(hostname)</b> to the latest script from GitHub?\nConnected Iran peers get updated too. The bot restarts at the end." \
+                '{"inline_keyboard":[[{"text":"✅ Yes, update all","callback_data":"update_yes"},{"text":"« Cancel","callback_data":"menu"}]]}' "$chat" ;;
+        update_yes)  tg_do_update "$chat" ;;
         *) tg_send "Unknown action." "$chat" ;;
     esac
+}
+
+# tg_do_update CHAT — update connected Iran peers first (while this bot is still
+# alive), then update THIS server detached (its reinstall restarts the bot, whose
+# own tg_notify sends the final ✅). Triggered by the ⬆️ Update button.
+tg_do_update() {
+    local chat="$1" pn pip any=0 out
+    tg_send "⬆️ <b>Update</b> started on $(hostname)…" "$chat"
+    local -A seen=()
+    while IFS=$'\t' read -r pn pip; do
+        [[ -n "$pn" && -n "$pip" ]] || continue
+        [[ -n "${seen[$pip]:-}" ]] && continue      # one update per remote IP
+        seen[$pip]=1; any=1
+        tg_send "🌐 Updating peer <b>${pn}</b> (${pip})… up to ~2 min." "$chat"
+        out="$(TQ_TIMEOUT=180 peer_run "$pn" update 2>&1 | tail -c 1200)"
+        tg_send "🌐 <b>${pn}</b>:\n<pre>${out:-no response}</pre>" "$chat"
+    done < <(peer_list 2>/dev/null)
+    (( any )) || tg_send "ℹ️ No connected peers to update." "$chat"
+    tg_send "⬆️ Updating <b>$(hostname)</b> now; the bot restarts and sends a ✅ when done." "$chat"
+    setsid bash -c "'$TM_CTL' update" >/dev/null 2>&1 &
 }
 
 # ---------------------------------------------------------------------------

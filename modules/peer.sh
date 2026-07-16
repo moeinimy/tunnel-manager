@@ -59,7 +59,7 @@ agent_serve() {
     # safe; `set`/edit is intentional so the foreign bot can manage the Iran side.
     case "$cmd" in
         list|names|fields|status|bandwidth|usage|traffic|report|logs|\
-        restart|start|stop|enable|disable|set)
+        restart|start|stop|enable|disable|set|update)
             NO_COLOR=1 "$TM_CTL" "$@" 2>&1 ;;
         *)  printf 'denied: %s\n' "$cmd" ;;
     esac
@@ -95,10 +95,11 @@ agent_firewall() {
 # ---------------------------------------------------------------------------
 # Client side — query a peer over the tunnel.
 # ---------------------------------------------------------------------------
-# agent_query IP CMD... — send CMD to the agent at IP, print its reply.
+# agent_query IP CMD... — send CMD to the agent at IP, print its reply. Override
+# the round-trip timeout with TQ_TIMEOUT (seconds) for slow ops like `update`.
 agent_query() {
     local ip="$1"; shift
-    TQ_IP="$ip" TQ_PORT="$TM_AGENT_PORT" TQ_CMD="$*" timeout 8 bash -c '
+    TQ_IP="$ip" TQ_PORT="$TM_AGENT_PORT" TQ_CMD="$*" timeout "${TQ_TIMEOUT:-8}" bash -c '
         exec 3<>"/dev/tcp/$TQ_IP/$TQ_PORT" || exit 1
         printf "%s\n" "$TQ_CMD" >&3
         cat <&3

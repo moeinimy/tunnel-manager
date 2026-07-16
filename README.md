@@ -183,9 +183,12 @@ remote end as a controllable **peer** the moment it's created — no extra setup
   **remote** (Iran-side) tunnels via 🌐 Peers. Typed shortcuts also exist:
   `/set <tunnel> <KEY> <VALUE>` locally, or
   `/peer <server> set <tunnel> <KEY> <VALUE>` (e.g. `/peer iran set bp BP_PORT 9000`).
+- **⬆️ Update (button):** updates this server to the latest script from GitHub
+  **and every connected Iran peer too** (peers first, then this box — the bot
+  restarts at the end and confirms). Also `/update`.
 - Commands: `/menu` `/status` `/tunnels` `/system` `/bandwidth` `/usage`
   `/report` `/peers` `/logs <name>` `/restart <name>` `/set …` `/peer …`
-  `/reboot`.
+  `/update` `/reboot`.
 
 The same actions are scriptable locally: `tunnelctl set <name> <KEY> <VALUE>`,
 `tunnelctl names`, `tunnelctl peer run <name> <cmd>`.

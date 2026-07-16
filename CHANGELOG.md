@@ -22,8 +22,13 @@ All notable changes to this project are documented here. The format is based on
   edit (regenerates the protocol config and restarts). **`tunnelctl names`** —
   list tunnel names.
 - **Peer agent** allowlist extended from read-only+restart to
-  `start/stop/restart/enable/disable/set/names` (the source is still restricted
-  to the authenticated tunnel peer), so the foreign bot can fully manage Iran.
+  `start/stop/restart/enable/disable/set/names/fields/update` (the source is
+  still restricted to the authenticated tunnel peer), so the foreign bot can
+  fully manage Iran.
+- **⬆️ Update button** in the bot: pulls the latest script from GitHub for this
+  server **and every connected Iran peer** (peers first over the agent with a
+  longer timeout, then this box detached so its reinstall can restart the bot;
+  the bot's own notify confirms when it's back). Also `/update`.
 
 ### Removed
 - **Reality driver removed.** The experimental VLESS+REALITY dokodemo relay never
