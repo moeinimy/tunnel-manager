@@ -5,6 +5,26 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/).
 
 
+## [2.3.2] - 2026-07-16
+
+### Changed
+- **Reality marked EXPERIMENTAL.** Live-tested on xray 26.3.27: TCP open, keys
+  verified (foreign privkey derives exactly the client's pubkey),
+  uuid/shortId/SNI/port match, clocks within 17s, camouflage dest reachable
+  (HTTP/2 200), Vision removed — yet the foreign REALITY inbound never accepts
+  the server-to-server relay handshake (Iran logs `in-443 >> reality-out` but the
+  far end silently drops/redirects). Root cause unresolved; likely a double-
+  REALITY relay quirk on this xray build. Driver kept (spec-correct, dry-run
+  validated) but flagged experimental. Proven TCP carriers remain **BackPack
+  (wssmux)** and **GOST (mtls)**, which already carry the user's Reality payload.
+
+## [2.3.1] - 2026-07-16
+
+### Changed
+- **Reality: dropped XTLS-Vision** from the relay (plain VLESS+Reality). The
+  tunnel doesn't need Vision — the user's own Reality payload already carries it
+  end-to-end — and it removed one variable while debugging the relay handshake.
+
 ## [2.3.0] - 2026-07-16
 
 ### Added

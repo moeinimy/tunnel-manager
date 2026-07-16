@@ -12,7 +12,22 @@ Continuation notes for a fresh session. Read this first.
   `git -c credential.helper= -c credential.helper='!f(){ echo username=moeinimy; echo "password=$GH_TOKEN"; }; f' push`.
   A new session will NOT have that token — ask the user to provide push access again, or have them push. (Tell them to REVOKE the old PAT — it's exposed in chat history.)
 
-## NEWEST (v2.3.0): Reality driver added
+## Reality driver — EXPERIMENTAL (did not complete on the user's live test)
+Live-tested v2.3.0/2.3.1 on the servers (xray **26.3.27**). Everything checks out
+individually: TCP to foreign:8443 open; keys verified (foreign privkey derives
+exactly the client's pubkey); uuid/shortId/SNI/port match; clocks within 17s;
+dest www.microsoft.com:443 reachable from foreign (HTTP/2 200); Vision removed to
+rule it out. YET the foreign REALITY inbound never logs an `accepted` for the
+tunnel connection — Iran logs `in-443 >> reality-out` but the far end silently
+drops/redirects. Root cause not found; looks like a server-to-server double-
+REALITY relay quirk on xray 26.3.27. Left in the tree as EXPERIMENTAL (spec-
+correct, dry-run validated). To revisit: capture a real handshake with
+`tcpdump -ni any tcp port 8443 -A` on foreign and check for ClientHello/
+ServerHello/reset; try an older xray; try a non-relay direct VLESS+Reality to
+isolate the relay layer. The proven TCP carriers remain BackPack (wssmux) + GOST
+(mtls) — they already carry the user's Reality payload fine.
+
+## Older (v2.3.0): Reality driver added
 Added **VLESS+REALITY+Vision** (`drivers/reality.sh`) on xray-core — the strongest
 anti-DPI TCP transport, works where UDP is blocked. Relay via dokodemo-door
 (foreign=vless+reality inbound+freedom; iran=dokodemo per port → vless+reality+

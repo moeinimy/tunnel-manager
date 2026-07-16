@@ -48,7 +48,7 @@ camouflage); the proven multiplexed-TLS performers are **BackPack (wssmux)** and
 | **GOST** | userspace relay | **mtls/mwss/grpc/wss** | ✅ Proven xray carrier (mtls); very versatile relay chains. |
 | **FRP** | userspace reverse proxy | tcpmux/TLS | Mature reverse-proxy with many features. |
 | **Hysteria 2** | **QUIC / UDP** + TLS + Salamander | Brutal CC | Excellent on lossy links — **but requires the foreign provider to allow inbound UDP.** |
-| **Reality** | **VLESS + REALITY + Vision (TCP)** on xray-core | Vision | 🥇 **Strongest anti-DPI, TCP.** Handshake is byte-for-byte a real HTTPS site; ~98% bypass. Works even where UDP is blocked. Relay via dokodemo-door. |
+| **Reality** ⚗️ | **VLESS + REALITY (TCP)** on xray-core | — | Strongest anti-DPI camouflage (byte-for-byte a real HTTPS site). **Experimental** — the server-to-server dokodemo relay did not complete the handshake on xray 26.3.27 in testing despite correct keys/TCP/clock/dest; verify on your xray version. For a proven TCP carrier use BackPack (wssmux) or GOST (mtls). |
 
 > ⚠️ **Hysteria needs open UDP.** It's QUIC-based; if your foreign provider blocks
 > inbound UDP (test with `tcpdump -ni any udp port <port>`), use a TCP transport
