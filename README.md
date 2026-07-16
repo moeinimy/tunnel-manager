@@ -172,8 +172,23 @@ Optional and off by default. See [docs/TELEGRAM.md](docs/TELEGRAM.md).
 ```bash
 sudo tunnelctl telegram config     # paste bot token + numeric chat id
 ```
-Bot commands: `/status` `/tunnels` `/system` `/bandwidth` `/report`
-`/logs <name>` `/restart <name>` `/reboot` `/help`.
+Run the bot on the **foreign** server (Iran usually can't reach api.telegram.org).
+From that one bot you control **both servers**: every tunnel auto-registers its
+remote end as a controllable **peer** the moment it's created — no extra setup.
+
+- **Per-tunnel control (buttons):** 🚇 Tunnels → pick a tunnel → Restart / Start /
+  Stop / Enable / Disable / Logs. Same menu for **remote** tunnels under 🌐 Peers →
+  pick a server → Manage tunnels.
+- **Remote edit:** `/set <tunnel> <KEY> <VALUE>` on the local box, or
+  `/peer <server> set <tunnel> <KEY> <VALUE>` to edit the Iran side from the
+  foreign bot (e.g. `/peer iran set bp BP_PORT 9000`). Changes regenerate the
+  config and restart the tunnel automatically.
+- Commands: `/menu` `/status` `/tunnels` `/system` `/bandwidth` `/usage`
+  `/report` `/peers` `/logs <name>` `/restart <name>` `/set …` `/peer …`
+  `/reboot`.
+
+The same actions are scriptable locally: `tunnelctl set <name> <KEY> <VALUE>`,
+`tunnelctl names`, `tunnelctl peer run <name> <cmd>`.
 
 ---
 

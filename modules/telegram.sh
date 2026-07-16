@@ -41,7 +41,7 @@ tg_send_kb() {
 tg_set_commands() {
     [[ -n "${TG_BOT_TOKEN:-}" ]] || return 1
     curl -fsS --max-time 15 --data-urlencode \
-        'commands=[{"command":"menu","description":"Open the button menu"},{"command":"status","description":"Tunnels status"},{"command":"bandwidth","description":"Live bandwidth"},{"command":"usage","description":"Traffic usage by period"},{"command":"system","description":"Server system info"},{"command":"peers","description":"Other servers"},{"command":"report","description":"Daily report"}]' \
+        'commands=[{"command":"menu","description":"Open the button menu"},{"command":"status","description":"Tunnels status"},{"command":"tunnels","description":"Control a tunnel (restart/start/stop…)"},{"command":"bandwidth","description":"Live bandwidth"},{"command":"usage","description":"Traffic usage by period"},{"command":"system","description":"Server system info"},{"command":"peers","description":"Control other servers"},{"command":"report","description":"Daily report"}]' \
         "${TG_API}/bot${TG_BOT_TOKEN}/setMyCommands" >/dev/null 2>&1
     # The "Menu" button next to the chat opens the command list (no /start needed).
     curl -fsS --max-time 15 --data-urlencode 'menu_button={"type":"commands"}' \
@@ -139,6 +139,38 @@ tg_kb_peers() {
     printf '{"inline_keyboard":[%s]}' "$rows"
 }
 
+# tg_kb_tun_actions NAME — full control menu for one LOCAL tunnel.
+tg_kb_tun_actions() {
+    local n="$1"
+    printf '{"inline_keyboard":[[{"text":"🔄 Restart","callback_data":"tact:%s:restart"},{"text":"▶️ Start","callback_data":"tact:%s:start"},{"text":"⏹ Stop","callback_data":"tact:%s:stop"}],[{"text":"✅ Enable","callback_data":"tact:%s:enable"},{"text":"🚫 Disable","callback_data":"tact:%s:disable"}],[{"text":"📜 Logs","callback_data":"tact:%s:logs"},{"text":"« Tunnels","callback_data":"tunnels"},{"text":"« Menu","callback_data":"menu"}]]}' \
+        "$n" "$n" "$n" "$n" "$n" "$n"
+}
+
+# tg_kb_peer NAME — control menu for a remote peer server.
+tg_kb_peer() {
+    local n="$1"
+    printf '{"inline_keyboard":[[{"text":"📊 Overview","callback_data":"pov:%s"},{"text":"🚇 Manage tunnels","callback_data":"pnames:%s"}],[{"text":"« Peers","callback_data":"peers"},{"text":"« Menu","callback_data":"menu"}]]}' \
+        "$n" "$n"
+}
+
+# tg_kb_peer_tuns PEER — one button per tunnel on the peer (queried live).
+tg_kb_peer_tuns() {
+    local peer="$1" t rows=""
+    while read -r t; do
+        [[ -n "$t" ]] || continue
+        rows+="${rows:+,}[{\"text\":\"🚇 ${t}\",\"callback_data\":\"ptun:${peer}:${t}\"}]"
+    done < <(peer_run "$peer" names 2>/dev/null | grep -viE 'unreachable|denied|forbidden')
+    rows+="${rows:+,}[{\"text\":\"« Back\",\"callback_data\":\"peer:${peer}\"}]"
+    printf '{"inline_keyboard":[%s]}' "$rows"
+}
+
+# tg_kb_peer_tun_actions PEER TUN — action menu for one remote tunnel.
+tg_kb_peer_tun_actions() {
+    local p="$1" t="$2"
+    printf '{"inline_keyboard":[[{"text":"🔄 Restart","callback_data":"pact:%s:%s:restart"},{"text":"▶️ Start","callback_data":"pact:%s:%s:start"},{"text":"⏹ Stop","callback_data":"pact:%s:%s:stop"}],[{"text":"✅ Enable","callback_data":"pact:%s:%s:enable"},{"text":"🚫 Disable","callback_data":"pact:%s:%s:disable"}],[{"text":"📊 Status","callback_data":"pact:%s:%s:status"},{"text":"📜 Logs","callback_data":"pact:%s:%s:logs"}],[{"text":"« Back","callback_data":"pnames:%s"}]]}' \
+        "$p" "$t" "$p" "$t" "$p" "$t" "$p" "$t" "$p" "$t" "$p" "$t" "$p" "$t" "$p"
+}
+
 # ---------------------------------------------------------------------------
 # Bot loop (handles both text commands and button callbacks)
 # ---------------------------------------------------------------------------
@@ -188,7 +220,8 @@ tg_command() {
     arg="${line#"$cmd"}"; arg="${arg# }"
     case "$cmd" in
         /start|/menu|/help) tg_action menu "$chat" ;;
-        /status|/tunnels)   tg_action status "$chat" ;;
+        /status)            tg_action status "$chat" ;;
+        /tunnels)           tg_action tunnels "$chat" ;;
         /system)            tg_action system "$chat" ;;
         /bandwidth)         tg_action bandwidth "$chat" ;;
         /usage|/traffic)    tg_action usage "$chat" ;;
@@ -199,6 +232,20 @@ tg_command() {
         /restart)
             if [[ -n "$arg" ]]; then tg_action "restart:$arg" "$chat"
             else tg_action restart_menu "$chat"; fi ;;
+        /set)
+            # /set <tunnel> <KEY> <VALUE> — edit a local field non-interactively.
+            local st sk sv; read -r st sk sv <<<"$arg"
+            if [[ -n "$st" && -n "$sk" ]]; then
+                if tunnel_set "$st" "$sk" "$sv" >/dev/null 2>&1; then tg_send "✏️ Set <b>${sk}=${sv}</b> on <b>${st}</b> (restarted)." "$chat"
+                else tg_send "❌ set failed — check tunnel name and field." "$chat"; fi
+            else tg_send "Usage: <code>/set &lt;tunnel&gt; &lt;KEY&gt; &lt;VALUE&gt;</code>" "$chat"; fi ;;
+        /peer)
+            # /peer <server> <cmd> [args] — control a remote peer (incl. set/edit).
+            local psrv prem; psrv="${arg%% *}"; prem="${arg#"$psrv"}"; prem="${prem# }"
+            if [[ -n "$psrv" && -n "$prem" ]]; then
+                # shellcheck disable=SC2086
+                tg_send "🌐 <b>${psrv}</b>:\n<pre>$(peer_run "$psrv" $prem 2>&1 | tail -c 3200)</pre>" "$chat"
+            else tg_send "Usage: <code>/peer &lt;server&gt; &lt;list|status|restart|start|stop|enable|disable|set&gt; [args]</code>\nExample: <code>/peer iran set bp BP_PORT 9000</code>" "$chat"; fi ;;
         *) tg_send "Unknown command. Send /menu." "$chat" ;;
     esac
 }
@@ -208,7 +255,24 @@ tg_action() {
     local data="$1" chat="$2"
     case "$data" in
         menu)        tg_send_kb "🚇 <b>Tunnel Manager</b> — $(hostname)\nChoose an option:" "$(tg_kb_main)" "$chat" ;;
-        status|tunnels) tg_send "$(tg_report_tunnels)" "$chat" ;;
+        status)      tg_send "$(tg_report_tunnels)" "$chat" ;;
+        tunnels)     tg_send_kb "🚇 <b>Tunnels</b> — pick one to control:" "$(tg_kb_tunnels tun)" "$chat" ;;
+        tun:*)
+            local tsel="${data#tun:}"
+            if tunnel_exists "$tsel"; then tg_send_kb "🚇 <b>${tsel}</b> — choose an action:" "$(tg_kb_tun_actions "$tsel")" "$chat"
+            else tg_send "No such tunnel: $tsel" "$chat"; fi ;;
+        tact:*)
+            local trest="${data#tact:}" tn ta
+            tn="${trest%%:*}"; ta="${trest##*:}"
+            if ! tunnel_exists "$tn"; then tg_send "No such tunnel: $tn" "$chat"
+            else case "$ta" in
+                restart) tunnel_restart "$tn" >/dev/null 2>&1 && tg_send "🔄 Restarted <b>$tn</b>." "$chat" || tg_send "❌ Restart of <b>$tn</b> failed." "$chat" ;;
+                start)   tunnel_start "$tn"   >/dev/null 2>&1 && tg_send "▶️ Started <b>$tn</b>." "$chat"   || tg_send "❌ Start of <b>$tn</b> failed." "$chat" ;;
+                stop)    tunnel_stop "$tn"    >/dev/null 2>&1 && tg_send "⏹ Stopped <b>$tn</b>." "$chat" ;;
+                enable)  tunnel_enable "$tn"  >/dev/null 2>&1 && tg_send "✅ Auto-start ON for <b>$tn</b>." "$chat" ;;
+                disable) tunnel_disable "$tn" >/dev/null 2>&1 && tg_send "🚫 Auto-start OFF for <b>$tn</b>." "$chat" ;;
+                logs)    local lb; lb="$(journalctl -u "$(unit_name "$tn")" -n 20 --no-pager 2>/dev/null | tail -c 3000)"; tg_send "<b>Logs ${tn}</b>\n<pre>${lb:-no logs}</pre>" "$chat" ;;
+            esac; fi ;;
         system)      tg_send "$(tg_report_system)" "$chat" ;;
         bandwidth)   tg_send "$(tg_report_bandwidth)" "$chat" ;;
         usage)       tg_send "$(report_usage)" "$chat" ;;
@@ -226,8 +290,23 @@ tg_action() {
             tg_send "<b>Logs ${ln}</b>\n<pre>${body:-no logs}</pre>" "$chat" ;;
         peer:*)
             local pn="${data#peer:}"
-            tg_send "🌐 Querying <b>$pn</b>…" "$chat"
-            tg_send "<b>$pn</b>\n<pre>$(peer_run "$pn" list 2>&1 | tail -c 3500)</pre>" "$chat" ;;
+            tg_send_kb "🌐 <b>${pn}</b> — remote server control:" "$(tg_kb_peer "$pn")" "$chat" ;;
+        pov:*)
+            local pov="${data#pov:}"
+            tg_send "🌐 Querying <b>$pov</b>…" "$chat"
+            tg_send "<b>$pov</b>\n<pre>$(peer_run "$pov" list 2>&1 | tail -c 3200)</pre>" "$chat" ;;
+        pnames:*)
+            local pnm="${data#pnames:}"
+            tg_send_kb "🚇 <b>${pnm}</b> tunnels — pick one:" "$(tg_kb_peer_tuns "$pnm")" "$chat" ;;
+        ptun:*)
+            local prest="${data#ptun:}" pp tt
+            pp="${prest%%:*}"; tt="${prest#*:}"
+            tg_send_kb "🚇 <b>${pp} / ${tt}</b> — choose an action:" "$(tg_kb_peer_tun_actions "$pp" "$tt")" "$chat" ;;
+        pact:*)
+            local arest="${data#pact:}" pp tt aa
+            pp="${arest%%:*}"; arest="${arest#*:}"; tt="${arest%%:*}"; aa="${arest##*:}"
+            tg_send "🌐 <b>${pp}</b>: ${aa} <b>${tt}</b>…" "$chat"
+            tg_send "<pre>$(peer_run "$pp" "$aa" "$tt" 2>&1 | tail -c 3000)</pre>" "$chat" ;;
         reboot_confirm)
             tg_send_kb "♻️ Reboot <b>$(hostname)</b>?" '{"inline_keyboard":[[{"text":"✅ Yes, reboot","callback_data":"reboot_yes"},{"text":"« Cancel","callback_data":"menu"}]]}' "$chat" ;;
         reboot_yes)  tg_send "♻️ Rebooting $(hostname) in 3s…" "$chat"; ( sleep 3; systemctl reboot ) & ;;

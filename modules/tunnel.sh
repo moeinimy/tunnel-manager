@@ -197,6 +197,42 @@ tunnel_edit() {
 # ---------------------------------------------------------------------------
 # Lifecycle
 # ---------------------------------------------------------------------------
+# tunnel_set NAME KEY VALUE — non-interactive field edit (scriptable + remote-
+# controllable via the peer agent / Telegram bot). Mirrors the interactive Edit:
+# updates one field, regenerates the protocol config, and restarts to apply.
+tunnel_set() {
+    require_root
+    local name="$1" key="$2" value="$3"
+    [[ -n "$name" && -n "$key" ]] || { log_error "usage: set <tunnel> <KEY> <VALUE>"; return 1; }
+    tunnel_exists "$name" || { log_error "No such tunnel: $name"; return 1; }
+    load_tunnel "$name"
+    if [[ "$_TM_NOEDIT_KEYS" == *" $key "* ]]; then log_error "Field '$key' is not editable."; return 1; fi
+    # The key must already exist, except REMOTE_IP which may be added to enable
+    # bot/peer control on a server-side tunnel that didn't have it.
+    if [[ -z "${TUN[$key]+x}" && "$key" != REMOTE_IP ]]; then
+        log_error "Unknown field '$key' for ${TUN[PROTOCOL]} tunnel '$name'."; return 1
+    fi
+    TUN[$key]="$value"
+    case "${TUN[PROTOCOL]}" in
+        paqet)    paqet_generate_config ;;
+        backhaul) backhaul_generate_config ;;
+        backpack) backpack_generate_config ;;
+        rathole)  rathole_generate_config ;;
+        gost)     gost_generate_config ;;
+        frp)      frp_generate_config ;;
+        hysteria) hysteria_generate_config ;;
+        reality)  reality_generate_config ;;
+    esac
+    save_tunnel
+    svc_install "$name"
+    agent_firewall ensure 2>/dev/null || true
+    log_ok "Set ${key}=${value} on '$name'. Restarting to apply…"
+    tunnel_restart "$name"
+}
+
+# tunnel_names — print tunnel names, one per line (used by remote/bot menus).
+tunnel_names() { list_tunnels; }
+
 tunnel_start() {
     require_root
     local name="${1:-}"; [[ -n "$name" ]] || { pick_tunnel name || return 0; }

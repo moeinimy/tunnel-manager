@@ -9,7 +9,7 @@
 # the tunnel is a private point-to-point link, no keys or manual setup are
 # needed: as soon as a tunnel is up, its remote end is controllable.
 
-TM_AGENT_ALLOW=(list status bandwidth report logs)   # read-only + restart below
+TM_AGENT_ALLOW=(list names status bandwidth report logs)   # read-only + control below
 : "${TM_AGENT_PORT:=8271}"
 
 # _peer_ip — the address to reach a tunnel's remote agent: the private inner IP
@@ -54,8 +54,12 @@ agent_serve() {
     # shellcheck disable=SC2086
     set -- $line
     local cmd="${1:-}"
+    # Read-only + tunnel control + non-interactive edit (set). The source is
+    # already restricted to the authenticated tunnel peer, so control ops are
+    # safe; `set`/edit is intentional so the foreign bot can manage the Iran side.
     case "$cmd" in
-        list|status|bandwidth|usage|traffic|report|logs|restart)
+        list|names|status|bandwidth|usage|traffic|report|logs|\
+        restart|start|stop|enable|disable|set)
             NO_COLOR=1 "$TM_CTL" "$@" 2>&1 ;;
         *)  printf 'denied: %s\n' "$cmd" ;;
     esac

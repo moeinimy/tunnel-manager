@@ -5,6 +5,29 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/).
 
 
+## [3.0.0] - 2026-07-16
+
+### Added
+- **Full remote control of the Iran side from the foreign Telegram bot.** Every
+  tunnel already auto-registers its remote as a controllable peer on creation
+  (no extra step); the bot now exposes real control, not just read-only:
+  - **Per-tunnel button menus** for local tunnels (🚇 Tunnels → pick → Restart /
+    Start / Stop / Enable / Disable / Logs) and the same for **remote** tunnels
+    (🌐 Peers → pick a server → Manage tunnels → per-tunnel actions).
+  - **Remote edit:** `/set <tunnel> <KEY> <VALUE>` locally, or
+    `/peer <server> set <tunnel> <KEY> <VALUE>` to edit the Iran side from the
+    foreign bot (e.g. `/peer iran set bp BP_PORT 9000`).
+- **`tunnelctl set <name> <KEY> <VALUE>`** — non-interactive, scriptable field
+  edit (regenerates the protocol config and restarts). **`tunnelctl names`** —
+  list tunnel names.
+- **Peer agent** allowlist extended from read-only+restart to
+  `start/stop/restart/enable/disable/set/names` (the source is still restricted
+  to the authenticated tunnel peer), so the foreign bot can fully manage Iran.
+
+### Notes
+- Culmination release: 9 protocol drivers (8 working + Reality experimental),
+  automatic bidirectional peer control, and a full button+command Telegram bot.
+
 ## [2.3.2] - 2026-07-16
 
 ### Changed

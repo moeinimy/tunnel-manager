@@ -43,7 +43,9 @@ ${C_BOLD}Commands:${C_RESET}
   (no args)              open the interactive menu
   add                    add a new tunnel (wizard)
   remove [name]          remove a tunnel
-  edit [name]            edit a tunnel
+  edit [name]            edit a tunnel (interactive)
+  set <name> <KEY> <VAL> change one field non-interactively (scriptable/remote)
+  names                  list tunnel names (one per line)
   start|stop|restart [name]
   enable|disable [name]  toggle auto-start on boot
   status [name]          show one tunnel (omit name for menu)
@@ -74,6 +76,8 @@ main() {
         add)            tunnel_add ;;
         remove|rm|del)  tunnel_remove "${1:-}" ;;
         edit)           tunnel_edit "${1:-}" ;;
+        set)            tunnel_set "${1:-}" "${2:-}" "${3:-}" ;;
+        names)          tunnel_names ;;
         start)          tunnel_start "${1:-}" ;;
         stop)           tunnel_stop "${1:-}" ;;
         restart)        tunnel_restart "${1:-}" ;;
