@@ -24,7 +24,7 @@ export TM_HOME
 for _f in \
     lib/common.sh lib/validate.sh lib/ui.sh lib/config.sh lib/ipam.sh \
     lib/state.sh lib/systemd.sh lib/deps.sh \
-    drivers/driver.sh drivers/gre.sh drivers/paqet.sh drivers/backhaul.sh drivers/backpack.sh drivers/rathole.sh drivers/gost.sh drivers/frp.sh drivers/hysteria.sh drivers/reality.sh \
+    drivers/driver.sh drivers/gre.sh drivers/paqet.sh drivers/backhaul.sh drivers/backpack.sh drivers/rathole.sh drivers/gost.sh drivers/frp.sh drivers/hysteria.sh \
     modules/telegram.sh modules/tunnel.sh modules/optimize.sh \
     modules/monitor.sh modules/report.sh modules/backup.sh modules/selfupdate.sh \
     modules/peer.sh lib/menu.sh ; do
@@ -78,6 +78,7 @@ main() {
         edit)           tunnel_edit "${1:-}" ;;
         set)            tunnel_set "${1:-}" "${2:-}" "${3:-}" ;;
         names)          tunnel_names ;;
+        fields)         tunnel_fields "${1:-}" ;;
         start)          tunnel_start "${1:-}" ;;
         stop)           tunnel_stop "${1:-}" ;;
         restart)        tunnel_restart "${1:-}" ;;

@@ -12,7 +12,16 @@ Continuation notes for a fresh session. Read this first.
   `git -c credential.helper= -c credential.helper='!f(){ echo username=moeinimy; echo "password=$GH_TOKEN"; }; f' push`.
   A new session will NOT have that token — ask the user to provide push access again, or have them push. (Tell them to REVOKE the old PAT — it's exposed in chat history.)
 
-## Reality driver — EXPERIMENTAL (did not complete on the user's live test)
+## Reality driver — REMOVED (v3.0.0)
+The experimental VLESS+REALITY dokodemo relay was removed after it never completed
+the server-to-server handshake on the live test (details below, kept for anyone who
+revisits it). All `reality`/`RE_*`/`TM_REALITY_DIR`/xray-core references were pulled
+from the drivers, dispatcher, tunnel menu, common.sh, install/uninstall. 8 protocols
+remain. Bot gained BUTTON-BASED edit (✏️ Edit → pick field → force-reply value),
+`tunnelctl set/names/fields`, and peer-agent control (start/stop/restart/enable/
+disable/set/fields/names).
+
+## (history) Reality driver — EXPERIMENTAL (did not complete on the user's live test)
 Live-tested v2.3.0/2.3.1 on the servers (xray **26.3.27**). Everything checks out
 individually: TCP to foreign:8443 open; keys verified (foreign privkey derives
 exactly the client's pubkey); uuid/shortId/SNI/port match; clocks within 17s;

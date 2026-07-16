@@ -37,6 +37,18 @@ tg_send_kb() {
         "${TG_API}/bot${TG_BOT_TOKEN}/sendMessage" >/dev/null 2>&1
 }
 
+# tg_send_force TEXT [CHAT] — message that forces the user's next message to be a
+# reply to it (used by the button-based edit flow to collect a value).
+tg_send_force() {
+    local text="$1" chat="${2:-$TG_CHAT_ID}"
+    [[ -n "${TG_BOT_TOKEN:-}" && -n "$chat" ]] || return 1
+    curl -fsS --max-time 20 \
+        -d "chat_id=${chat}" -d "parse_mode=HTML" -d "disable_web_page_preview=true" \
+        --data-urlencode "text=${text}" \
+        --data-urlencode 'reply_markup={"force_reply":true,"input_field_placeholder":"new value"}' \
+        "${TG_API}/bot${TG_BOT_TOKEN}/sendMessage" >/dev/null 2>&1
+}
+
 # tg_set_commands — register the "/" command menu (shows next to the input box).
 tg_set_commands() {
     [[ -n "${TG_BOT_TOKEN:-}" ]] || return 1
@@ -142,8 +154,34 @@ tg_kb_peers() {
 # tg_kb_tun_actions NAME — full control menu for one LOCAL tunnel.
 tg_kb_tun_actions() {
     local n="$1"
-    printf '{"inline_keyboard":[[{"text":"🔄 Restart","callback_data":"tact:%s:restart"},{"text":"▶️ Start","callback_data":"tact:%s:start"},{"text":"⏹ Stop","callback_data":"tact:%s:stop"}],[{"text":"✅ Enable","callback_data":"tact:%s:enable"},{"text":"🚫 Disable","callback_data":"tact:%s:disable"}],[{"text":"📜 Logs","callback_data":"tact:%s:logs"},{"text":"« Tunnels","callback_data":"tunnels"},{"text":"« Menu","callback_data":"menu"}]]}' \
-        "$n" "$n" "$n" "$n" "$n" "$n"
+    printf '{"inline_keyboard":[[{"text":"🔄 Restart","callback_data":"tact:%s:restart"},{"text":"▶️ Start","callback_data":"tact:%s:start"},{"text":"⏹ Stop","callback_data":"tact:%s:stop"}],[{"text":"✅ Enable","callback_data":"tact:%s:enable"},{"text":"🚫 Disable","callback_data":"tact:%s:disable"}],[{"text":"✏️ Edit","callback_data":"tedit:%s"},{"text":"📜 Logs","callback_data":"tact:%s:logs"}],[{"text":"« Tunnels","callback_data":"tunnels"},{"text":"« Menu","callback_data":"menu"}]]}' \
+        "$n" "$n" "$n" "$n" "$n" "$n" "$n"
+}
+
+# tg_kb_tun_fields NAME — one button per editable field of a LOCAL tunnel.
+tg_kb_tun_fields() {
+    local n="$1" k v rows=""
+    if load_tunnel "$n" 2>/dev/null; then
+        while read -r k; do
+            [[ "$_TM_NOEDIT_KEYS" == *" $k "* ]] && continue
+            v="${TUN[$k]}"; [[ ${#v} -gt 18 ]] && v="${v:0:18}…"
+            rows+="${rows:+,}[{\"text\":\"✏️ ${k} = ${v}\",\"callback_data\":\"tsetk:${n}:${k}\"}]"
+        done < <(printf '%s\n' "${!TUN[@]}" | sort)
+    fi
+    rows+="${rows:+,}[{\"text\":\"« Back\",\"callback_data\":\"tun:${n}\"}]"
+    printf '{"inline_keyboard":[%s]}' "$rows"
+}
+
+# tg_kb_peer_fields PEER TUN — one button per editable field of a REMOTE tunnel.
+tg_kb_peer_fields() {
+    local p="$1" t="$2" line k v rows=""
+    while IFS= read -r line; do
+        [[ "$line" == *=* ]] || continue
+        k="${line%%=*}"; v="${line#*=}"; [[ ${#v} -gt 18 ]] && v="${v:0:18}…"
+        rows+="${rows:+,}[{\"text\":\"✏️ ${k} = ${v}\",\"callback_data\":\"psetk:${p}:${t}:${k}\"}]"
+    done < <(peer_run "$p" fields "$t" 2>/dev/null | grep -viE 'unreachable|denied|forbidden|no such')
+    rows+="${rows:+,}[{\"text\":\"« Back\",\"callback_data\":\"ptun:${p}:${t}\"}]"
+    printf '{"inline_keyboard":[%s]}' "$rows"
 }
 
 # tg_kb_peer NAME — control menu for a remote peer server.
@@ -167,8 +205,8 @@ tg_kb_peer_tuns() {
 # tg_kb_peer_tun_actions PEER TUN — action menu for one remote tunnel.
 tg_kb_peer_tun_actions() {
     local p="$1" t="$2"
-    printf '{"inline_keyboard":[[{"text":"🔄 Restart","callback_data":"pact:%s:%s:restart"},{"text":"▶️ Start","callback_data":"pact:%s:%s:start"},{"text":"⏹ Stop","callback_data":"pact:%s:%s:stop"}],[{"text":"✅ Enable","callback_data":"pact:%s:%s:enable"},{"text":"🚫 Disable","callback_data":"pact:%s:%s:disable"}],[{"text":"📊 Status","callback_data":"pact:%s:%s:status"},{"text":"📜 Logs","callback_data":"pact:%s:%s:logs"}],[{"text":"« Back","callback_data":"pnames:%s"}]]}' \
-        "$p" "$t" "$p" "$t" "$p" "$t" "$p" "$t" "$p" "$t" "$p" "$t" "$p" "$t" "$p"
+    printf '{"inline_keyboard":[[{"text":"🔄 Restart","callback_data":"pact:%s:%s:restart"},{"text":"▶️ Start","callback_data":"pact:%s:%s:start"},{"text":"⏹ Stop","callback_data":"pact:%s:%s:stop"}],[{"text":"✅ Enable","callback_data":"pact:%s:%s:enable"},{"text":"🚫 Disable","callback_data":"pact:%s:%s:disable"}],[{"text":"✏️ Edit","callback_data":"pedit:%s:%s"},{"text":"📊 Status","callback_data":"pact:%s:%s:status"},{"text":"📜 Logs","callback_data":"pact:%s:%s:logs"}],[{"text":"« Back","callback_data":"pnames:%s"}]]}' \
+        "$p" "$t" "$p" "$t" "$p" "$t" "$p" "$t" "$p" "$t" "$p" "$t" "$p" "$t" "$p" "$t" "$p"
 }
 
 # ---------------------------------------------------------------------------
@@ -178,7 +216,7 @@ tg_bot_run() {
     tg_enabled || { log_warn "Telegram not configured; bot exiting."; return 0; }
     log_info "Telegram bot started."
     tg_set_commands || true
-    local offset=0 resp n i chat text cb_id cb_chat cb_data
+    local offset=0 resp n i chat text cb_id cb_chat cb_data rto
     while true; do
         resp="$(curl -fsS --max-time 60 \
             "${TG_API}/bot${TG_BOT_TOKEN}/getUpdates?timeout=50&offset=${offset}&allowed_updates=%5B%22message%22%2C%22callback_query%22%5D" 2>/dev/null)" || { sleep 3; continue; }
@@ -197,11 +235,40 @@ tg_bot_run() {
             fi
             chat="$(printf '%s' "$resp" | jq -r ".result[$i].message.chat.id // empty")"
             text="$(printf '%s' "$resp" | jq -r ".result[$i].message.text // empty")"
+            rto="$(printf '%s' "$resp" | jq -r ".result[$i].message.reply_to_message.text // empty")"
             [[ -n "$text" ]] || continue
             [[ "$chat" == "$TG_CHAT_ID" ]] || { tg_send "⛔ Unauthorized." "$chat"; continue; }
-            tg_command "$text" "$chat"
+            # A reply to a "🔧 EDIT/PEER …" prompt carries the value for a button edit.
+            if [[ "$rto" == *"🔧 EDIT "* || "$rto" == *"🔧 PEER "* ]]; then
+                tg_apply_edit "$rto" "$text" "$chat"
+            else
+                tg_command "$text" "$chat"
+            fi
         done
     done
+}
+
+# tg_apply_edit MARKER VALUE CHAT — a button-edit reply arrived. MARKER is the
+# quoted prompt text containing "🔧 EDIT <tunnel> <key>" (local) or
+# "🔧 PEER <peer> <tunnel> <key>" (remote); VALUE is the user's reply.
+tg_apply_edit() {
+    local marker="$1" value="$2" chat="$3" line
+    line="$(printf '%s\n' "$marker" | grep -m1 '🔧 ')"
+    line="${line#*🔧 }"
+    # shellcheck disable=SC2086
+    set -- $line
+    case "$1" in
+        EDIT)
+            local n="$2" k="$3"
+            if tunnel_set "$n" "$k" "$value" >/dev/null 2>&1; then
+                tg_send "✏️ Set <b>${k}=${value}</b> on <b>${n}</b> (restarted)." "$chat"
+            else tg_send "❌ Edit failed on <b>${n}</b> — check the value." "$chat"; fi ;;
+        PEER)
+            local p="$2" t="$3" k="$4"
+            tg_send "🌐 <b>${p}</b>: setting ${k}…" "$chat"
+            tg_send "<pre>$(peer_run "$p" set "$t" "$k" "$value" 2>&1 | tail -c 2500)</pre>" "$chat" ;;
+        *)  tg_send "⚠️ Could not parse the edit target." "$chat" ;;
+    esac
 }
 
 # tg_command "TEXT" CHAT — map a typed command to an action.
@@ -307,6 +374,23 @@ tg_action() {
             pp="${arest%%:*}"; arest="${arest#*:}"; tt="${arest%%:*}"; aa="${arest##*:}"
             tg_send "🌐 <b>${pp}</b>: ${aa} <b>${tt}</b>…" "$chat"
             tg_send "<pre>$(peer_run "$pp" "$aa" "$tt" 2>&1 | tail -c 3000)</pre>" "$chat" ;;
+        tedit:*)
+            local ten="${data#tedit:}"
+            if tunnel_exists "$ten"; then tg_send_kb "✏️ <b>${ten}</b> — pick a field to edit:" "$(tg_kb_tun_fields "$ten")" "$chat"
+            else tg_send "No such tunnel: $ten" "$chat"; fi ;;
+        tsetk:*)
+            local sr="${data#tsetk:}" sn sk cur=""
+            sn="${sr%%:*}"; sk="${sr#*:}"
+            if tunnel_exists "$sn"; then load_tunnel "$sn"; cur="${TUN[$sk]:-}"; fi
+            tg_send_force "✏️ New value for <b>${sk}</b> on <b>${sn}</b>?\nCurrent: <code>${cur}</code>\n↩️ <i>Reply to this message with the new value.</i>\n🔧 EDIT ${sn} ${sk}" "$chat" ;;
+        pedit:*)
+            local per="${data#pedit:}" pp tt
+            pp="${per%%:*}"; tt="${per#*:}"
+            tg_send_kb "✏️ <b>${pp}/${tt}</b> — pick a field to edit:" "$(tg_kb_peer_fields "$pp" "$tt")" "$chat" ;;
+        psetk:*)
+            local qr="${data#psetk:}" pp tt kk
+            pp="${qr%%:*}"; qr="${qr#*:}"; tt="${qr%%:*}"; kk="${qr##*:}"
+            tg_send_force "✏️ New value for <b>${kk}</b> on <b>${pp}/${tt}</b>?\n↩️ <i>Reply to this message with the new value.</i>\n🔧 PEER ${pp} ${tt} ${kk}" "$chat" ;;
         reboot_confirm)
             tg_send_kb "♻️ Reboot <b>$(hostname)</b>?" '{"inline_keyboard":[[{"text":"✅ Yes, reboot","callback_data":"reboot_yes"},{"text":"« Cancel","callback_data":"menu"}]]}' "$chat" ;;
         reboot_yes)  tg_send "♻️ Rebooting $(hostname) in 3s…" "$chat"; ( sleep 3; systemctl reboot ) & ;;

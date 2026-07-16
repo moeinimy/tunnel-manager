@@ -14,9 +14,10 @@ All notable changes to this project are documented here. The format is based on
   - **Per-tunnel button menus** for local tunnels (🚇 Tunnels → pick → Restart /
     Start / Stop / Enable / Disable / Logs) and the same for **remote** tunnels
     (🌐 Peers → pick a server → Manage tunnels → per-tunnel actions).
-  - **Remote edit:** `/set <tunnel> <KEY> <VALUE>` locally, or
-    `/peer <server> set <tunnel> <KEY> <VALUE>` to edit the Iran side from the
-    foreign bot (e.g. `/peer iran set bp BP_PORT 9000`).
+  - **Button-based edit:** the per-tunnel menu has an **✏️ Edit** button → pick a
+    field → the bot asks for the new value (force-reply) → you reply and it
+    applies + restarts. Works for local tunnels and for **remote** (peer) tunnels
+    the same way. Typed `/set` and `/peer … set …` remain as power-user shortcuts.
 - **`tunnelctl set <name> <KEY> <VALUE>`** — non-interactive, scriptable field
   edit (regenerates the protocol config and restarts). **`tunnelctl names`** —
   list tunnel names.
@@ -24,9 +25,17 @@ All notable changes to this project are documented here. The format is based on
   `start/stop/restart/enable/disable/set/names` (the source is still restricted
   to the authenticated tunnel peer), so the foreign bot can fully manage Iran.
 
+### Removed
+- **Reality driver removed.** The experimental VLESS+REALITY dokodemo relay never
+  completed the server-to-server handshake on the test setup (xray 26.3.27)
+  despite correct keys/TCP/clock/dest; dropped to keep the tool to protocols that
+  actually work. The proven TCP carriers are **BackPack (wssmux)** and **GOST
+  (mtls)**, which already carry a Reality payload end-to-end.
+
 ### Notes
-- Culmination release: 9 protocol drivers (8 working + Reality experimental),
-  automatic bidirectional peer control, and a full button+command Telegram bot.
+- Culmination release: 8 working protocol drivers, automatic bidirectional peer
+  control, and a full button-driven Telegram bot (control **and** edit, local +
+  remote).
 
 ## [2.3.2] - 2026-07-16
 

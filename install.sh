@@ -75,7 +75,7 @@ TM_HOME="$INSTALL_DIR"; export TM_HOME
 unset TM_BIN_DIR
 for _lib in lib/common.sh lib/validate.sh lib/config.sh lib/ipam.sh \
             lib/systemd.sh drivers/driver.sh drivers/gre.sh drivers/paqet.sh \
-            drivers/backhaul.sh drivers/backpack.sh drivers/rathole.sh drivers/gost.sh drivers/frp.sh drivers/hysteria.sh drivers/reality.sh \
+            drivers/backhaul.sh drivers/backpack.sh drivers/rathole.sh drivers/gost.sh drivers/frp.sh drivers/hysteria.sh \
             modules/peer.sh; do
     # shellcheck source=/dev/null
     . "$INSTALL_DIR/$_lib"

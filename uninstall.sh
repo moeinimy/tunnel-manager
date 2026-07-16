@@ -35,8 +35,6 @@ if [[ -f "$INSTALL_DIR/lib/common.sh" ]]; then
     # shellcheck source=/dev/null
     . "$INSTALL_DIR/drivers/hysteria.sh"
     # shellcheck source=/dev/null
-    . "$INSTALL_DIR/drivers/reality.sh"
-    # shellcheck source=/dev/null
     . "$INSTALL_DIR/lib/ipam.sh"
 else
     echo "Tunnel Manager does not appear to be installed at $INSTALL_DIR."

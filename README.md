@@ -1,7 +1,7 @@
 # Tunnel Manager
 
 **A unified, production-ready manager for high-performance tunnels between Iran
-and foreign servers — nine pluggable protocols (kernel GRE plus eight userspace,
+and foreign servers — eight pluggable protocols (kernel GRE plus seven userspace,
 DPI-resistant transports) in one clean, modular tool, each chosen per-tunnel.**
 
 Built from the ground up (inspired by, but not copied from,
@@ -17,7 +17,7 @@ multi-tunnel data model, and no reversible tuning.
 
 | Area | What you get |
 |------|--------------|
-| **Nine protocols** | GRE, Paqet, Backhaul, BackPack, Rathole, GOST, FRP, Hysteria 2 and Reality — chosen per-tunnel (see the table below). |
+| **Eight protocols** | GRE, Paqet, Backhaul, BackPack, Rathole, GOST, FRP and Hysteria 2 — chosen per-tunnel (see the table below). |
 | **Unlimited tunnels** | Independent profiles. One Iran ↔ many foreign, one foreign ↔ many Iran, or full mesh. |
 | **Persistent** | Every tunnel is a `systemd` service — survives reboot, with enable/disable auto-start. |
 | **Auto IP allocation** | Conflict-free `/30` inner subnets from a pool; duplicate/collision detection. |
@@ -33,10 +33,10 @@ multi-tunnel data model, and no reversible tuning.
 
 ## 🔌 Protocols
 
-All are selectable per-tunnel. For carrying **xray/Reality across DPI** over **TCP** (needed when the foreign
-provider blocks UDP), the strongest option is **Reality** (byte-for-byte HTTPS
-camouflage); the proven multiplexed-TLS performers are **BackPack (wssmux)** and
-**GOST (mtls)**. Plain-TCP relays get DPI-reset, so prefer these.
+All are selectable per-tunnel. For carrying **xray/Reality across DPI** over **TCP**
+(needed when the foreign provider blocks UDP), the proven multiplexed-TLS
+performers are **BackPack (wssmux)** and **GOST (mtls)**. Plain-TCP relays get
+DPI-reset, so prefer these.
 
 | Protocol | Layer / transport | Mux / TLS | Best for |
 |----------|-------------------|-----------|----------|
@@ -48,7 +48,6 @@ camouflage); the proven multiplexed-TLS performers are **BackPack (wssmux)** and
 | **GOST** | userspace relay | **mtls/mwss/grpc/wss** | ✅ Proven xray carrier (mtls); very versatile relay chains. |
 | **FRP** | userspace reverse proxy | tcpmux/TLS | Mature reverse-proxy with many features. |
 | **Hysteria 2** | **QUIC / UDP** + TLS + Salamander | Brutal CC | Excellent on lossy links — **but requires the foreign provider to allow inbound UDP.** |
-| **Reality** ⚗️ | **VLESS + REALITY (TCP)** on xray-core | — | Strongest anti-DPI camouflage (byte-for-byte a real HTTPS site). **Experimental** — the server-to-server dokodemo relay did not complete the handshake on xray 26.3.27 in testing despite correct keys/TCP/clock/dest; verify on your xray version. For a proven TCP carrier use BackPack (wssmux) or GOST (mtls). |
 
 > ⚠️ **Hysteria needs open UDP.** It's QUIC-based; if your foreign provider blocks
 > inbound UDP (test with `tcpdump -ni any udp port <port>`), use a TCP transport
@@ -121,7 +120,7 @@ tunnel-manager/
 ├── tunnelctl              # entry point: menu + scriptable CLI
 ├── install.sh / uninstall.sh / update.sh
 ├── lib/                   # common, ui, validate, config, ipam, state, systemd, deps, menu
-├── drivers/               # driver.sh dispatcher + gre/paqet/backhaul/backpack/rathole/gost/frp/hysteria/reality (pluggable protocols)
+├── drivers/               # driver.sh dispatcher + gre/paqet/backhaul/backpack/rathole/gost/frp/hysteria (pluggable protocols)
 ├── modules/               # tunnel, optimize, monitor, telegram, report, backup, selfupdate
 ├── systemd/               # tm-monitor / tm-bot / tm-report units + timer
 └── docs/                  # ARCHITECTURE, TELEGRAM, TROUBLESHOOTING
@@ -179,10 +178,11 @@ remote end as a controllable **peer** the moment it's created — no extra setup
 - **Per-tunnel control (buttons):** 🚇 Tunnels → pick a tunnel → Restart / Start /
   Stop / Enable / Disable / Logs. Same menu for **remote** tunnels under 🌐 Peers →
   pick a server → Manage tunnels.
-- **Remote edit:** `/set <tunnel> <KEY> <VALUE>` on the local box, or
-  `/peer <server> set <tunnel> <KEY> <VALUE>` to edit the Iran side from the
-  foreign bot (e.g. `/peer iran set bp BP_PORT 9000`). Changes regenerate the
-  config and restart the tunnel automatically.
+- **Edit (buttons):** each tunnel's menu has **✏️ Edit** → tap a field → the bot
+  asks for the new value → reply and it applies + restarts. Works the same for
+  **remote** (Iran-side) tunnels via 🌐 Peers. Typed shortcuts also exist:
+  `/set <tunnel> <KEY> <VALUE>` locally, or
+  `/peer <server> set <tunnel> <KEY> <VALUE>` (e.g. `/peer iran set bp BP_PORT 9000`).
 - Commands: `/menu` `/status` `/tunnels` `/system` `/bandwidth` `/usage`
   `/report` `/peers` `/logs <name>` `/restart <name>` `/set …` `/peer …`
   `/reboot`.
