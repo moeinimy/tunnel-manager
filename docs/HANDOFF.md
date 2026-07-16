@@ -12,6 +12,15 @@ Continuation notes for a fresh session. Read this first.
   `git -c credential.helper= -c credential.helper='!f(){ echo username=moeinimy; echo "password=$GH_TOKEN"; }; f' push`.
   A new session will NOT have that token — ask the user to provide push access again, or have them push. (Tell them to REVOKE the old PAT — it's exposed in chat history.)
 
+## NEWEST (v2.3.0): Reality driver added
+Added **VLESS+REALITY+Vision** (`drivers/reality.sh`) on xray-core — the strongest
+anti-DPI TCP transport, works where UDP is blocked. Relay via dokodemo-door
+(foreign=vless+reality inbound+freedom; iran=dokodemo per port → vless+reality+
+vision outbound → foreign 127.0.0.1:target). Server prints a base64 connection
+string (uuid|pubkey|shortId|sni|port); client pastes it. JSON dry-run validated
+(both roles parse). AWAITING LIVE TEST. If it connects but stalls, try dropping
+Vision (empty `flow`) — Vision over dokodemo relay is the one uncertain bit.
+
 ## What works (6 protocols tested with the user's real xray; BackPack code-complete, awaiting live test)
 GRE, Paqet, Backhaul, Rathole, **GOST (mtls)**, FRP. **BackPack** (added v2.1.0)
 was live-tested on the servers — tunnel carries xray over wssmux. From that test:

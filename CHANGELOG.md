@@ -5,6 +5,27 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/).
 
 
+## [2.3.0] - 2026-07-16
+
+### Added
+- **VLESS + REALITY + Vision driver** (`drivers/reality.sh`) — the strongest
+  anti-DPI **TCP** transport available (community-measured ~98% bypass in Iran,
+  2026). REALITY makes the tunnel's TLS handshake byte-for-byte identical to a
+  real HTTPS site (it borrows a genuine domain's cert/handshake — no self-signed
+  cert, no novel fingerprint), and XTLS-Vision flattens the TLS-in-TLS length
+  signature. Being TCP, it works even where the foreign provider blocks UDP
+  (unlike Hysteria/TUIC).
+  - Runs on **xray-core** (auto-downloaded). Real port-forward relay via
+    **dokodemo-door**: foreign = VLESS+REALITY inbound + freedom outbound; Iran =
+    one dokodemo inbound per user port → VLESS+REALITY+Vision outbound. So xray
+    client → iran:<listen> → REALITY tunnel → foreign → 127.0.0.1:<target>.
+  - **One-copy key coordination:** the server generates the x25519 keypair, UUID
+    and shortId and prints a base64 **connection string**; the client just pastes
+    it (uuid|publicKey|shortId|sni|port). Camouflage SNI is configurable
+    (default `www.microsoft.com`).
+  - Config self-tested with `xray run -test` before start; reuses the shared auto
+    peer-control flow. Registered in all dispatch points.
+
 ## [2.2.0] - 2026-07-16
 
 ### Added

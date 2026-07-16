@@ -16,7 +16,7 @@
 #   <p>_sample NAME     refresh RX/TX counters in state (best-effort)
 #   <p>_wizard          interactive prompts populating TUN (add flow)
 
-TM_SUPPORTED_PROTOCOLS=(gre paqet backhaul backpack rathole gost frp hysteria)
+TM_SUPPORTED_PROTOCOLS=(gre paqet backhaul backpack rathole gost frp hysteria reality)
 
 _driver_fn() {
     local proto="${TUN[PROTOCOL]:-}" fn="$1"

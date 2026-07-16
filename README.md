@@ -1,7 +1,7 @@
 # Tunnel Manager
 
 **A unified, production-ready manager for high-performance tunnels between Iran
-and foreign servers — eight pluggable protocols (kernel GRE plus seven userspace,
+and foreign servers — nine pluggable protocols (kernel GRE plus eight userspace,
 DPI-resistant transports) in one clean, modular tool, each chosen per-tunnel.**
 
 Built from the ground up (inspired by, but not copied from,
@@ -17,7 +17,7 @@ multi-tunnel data model, and no reversible tuning.
 
 | Area | What you get |
 |------|--------------|
-| **Eight protocols** | GRE, Paqet, Backhaul, BackPack, Rathole, GOST, FRP and Hysteria 2 — chosen per-tunnel (see the table below). |
+| **Nine protocols** | GRE, Paqet, Backhaul, BackPack, Rathole, GOST, FRP, Hysteria 2 and Reality — chosen per-tunnel (see the table below). |
 | **Unlimited tunnels** | Independent profiles. One Iran ↔ many foreign, one foreign ↔ many Iran, or full mesh. |
 | **Persistent** | Every tunnel is a `systemd` service — survives reboot, with enable/disable auto-start. |
 | **Auto IP allocation** | Conflict-free `/30` inner subnets from a pool; duplicate/collision detection. |
@@ -33,10 +33,10 @@ multi-tunnel data model, and no reversible tuning.
 
 ## 🔌 Protocols
 
-All are selectable per-tunnel. For carrying **xray/Reality across DPI**, the
-proven performers are the multiplexed-TLS **TCP** transports — **BackPack
-(wssmux)** and **GOST (mtls)** — because plain-TCP relays get DPI-reset and
-**UDP is blocked on some foreign providers** (see the note on Hysteria).
+All are selectable per-tunnel. For carrying **xray/Reality across DPI** over **TCP** (needed when the foreign
+provider blocks UDP), the strongest option is **Reality** (byte-for-byte HTTPS
+camouflage); the proven multiplexed-TLS performers are **BackPack (wssmux)** and
+**GOST (mtls)**. Plain-TCP relays get DPI-reset, so prefer these.
 
 | Protocol | Layer / transport | Mux / TLS | Best for |
 |----------|-------------------|-----------|----------|
@@ -48,6 +48,7 @@ proven performers are the multiplexed-TLS **TCP** transports — **BackPack
 | **GOST** | userspace relay | **mtls/mwss/grpc/wss** | ✅ Proven xray carrier (mtls); very versatile relay chains. |
 | **FRP** | userspace reverse proxy | tcpmux/TLS | Mature reverse-proxy with many features. |
 | **Hysteria 2** | **QUIC / UDP** + TLS + Salamander | Brutal CC | Excellent on lossy links — **but requires the foreign provider to allow inbound UDP.** |
+| **Reality** | **VLESS + REALITY + Vision (TCP)** on xray-core | Vision | 🥇 **Strongest anti-DPI, TCP.** Handshake is byte-for-byte a real HTTPS site; ~98% bypass. Works even where UDP is blocked. Relay via dokodemo-door. |
 
 > ⚠️ **Hysteria needs open UDP.** It's QUIC-based; if your foreign provider blocks
 > inbound UDP (test with `tcpdump -ni any udp port <port>`), use a TCP transport
@@ -120,7 +121,7 @@ tunnel-manager/
 ├── tunnelctl              # entry point: menu + scriptable CLI
 ├── install.sh / uninstall.sh / update.sh
 ├── lib/                   # common, ui, validate, config, ipam, state, systemd, deps, menu
-├── drivers/               # driver.sh dispatcher + gre/paqet/backhaul/backpack/rathole/gost/frp/hysteria (pluggable protocols)
+├── drivers/               # driver.sh dispatcher + gre/paqet/backhaul/backpack/rathole/gost/frp/hysteria/reality (pluggable protocols)
 ├── modules/               # tunnel, optimize, monitor, telegram, report, backup, selfupdate
 ├── systemd/               # tm-monitor / tm-bot / tm-report units + timer
 └── docs/                  # ARCHITECTURE, TELEGRAM, TROUBLESHOOTING

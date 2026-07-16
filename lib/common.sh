@@ -15,6 +15,7 @@
 : "${TM_BACKHAUL_DIR:=$TM_CONFIG_DIR/backhaul}"
 : "${TM_BACKPACK_DIR:=$TM_CONFIG_DIR/backpack}"
 : "${TM_HYSTERIA_DIR:=$TM_CONFIG_DIR/hysteria}"
+: "${TM_REALITY_DIR:=$TM_CONFIG_DIR/reality}"
 : "${TM_RATHOLE_DIR:=$TM_CONFIG_DIR/rathole}"
 : "${TM_GOST_DIR:=$TM_CONFIG_DIR/gost}"
 : "${TM_FRP_DIR:=$TM_CONFIG_DIR/frp}"
@@ -113,7 +114,7 @@ confirm() {
 # ensure_dirs — create the runtime directory tree with sane permissions.
 ensure_dirs() {
     local d
-    for d in "$TM_CONFIG_DIR" "$TM_TUNNELS_DIR" "$TM_PAQET_DIR" "$TM_BACKHAUL_DIR" "$TM_BACKPACK_DIR" "$TM_HYSTERIA_DIR" "$TM_RATHOLE_DIR" "$TM_GOST_DIR" "$TM_FRP_DIR" \
+    for d in "$TM_CONFIG_DIR" "$TM_TUNNELS_DIR" "$TM_PAQET_DIR" "$TM_BACKHAUL_DIR" "$TM_BACKPACK_DIR" "$TM_HYSTERIA_DIR" "$TM_REALITY_DIR" "$TM_RATHOLE_DIR" "$TM_GOST_DIR" "$TM_FRP_DIR" \
              "$TM_STATE_DIR" "$TM_STATE_TUNNELS" "$TM_BACKUP_DIR" "$TM_LOG_DIR"; do
         mkdir -p "$d" 2>/dev/null || true
     done
