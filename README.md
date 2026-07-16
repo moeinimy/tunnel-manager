@@ -1,8 +1,8 @@
 # Tunnel Manager
 
 **A unified, production-ready manager for high-performance tunnels between Iran
-and foreign servers — supporting both GRE (kernel) and Paqet (userspace,
-DPI-resistant) protocols in one clean, modular tool.**
+and foreign servers — eight pluggable protocols (kernel GRE plus seven userspace,
+DPI-resistant transports) in one clean, modular tool, each chosen per-tunnel.**
 
 Built from the ground up (inspired by, but not copied from,
 [`vatanhost/gre`](https://github.com/vatanhost/gre),
@@ -17,7 +17,7 @@ multi-tunnel data model, and no reversible tuning.
 
 | Area | What you get |
 |------|--------------|
-| **Two protocols** | GRE (fast kernel L3 tunnel) and Paqet (encrypted KCP-over-raw-socket, bypasses DPI). Chosen per-tunnel. |
+| **Eight protocols** | GRE, Paqet, Backhaul, BackPack, Rathole, GOST, FRP and Hysteria 2 — chosen per-tunnel (see the table below). |
 | **Unlimited tunnels** | Independent profiles. One Iran ↔ many foreign, one foreign ↔ many Iran, or full mesh. |
 | **Persistent** | Every tunnel is a `systemd` service — survives reboot, with enable/disable auto-start. |
 | **Auto IP allocation** | Conflict-free `/30` inner subnets from a pool; duplicate/collision detection. |
@@ -28,6 +28,30 @@ multi-tunnel data model, and no reversible tuning.
 | **Reports** | Daily/weekly/monthly reports delivered to Telegram on a timer. |
 | **Backup/Restore** | Portable backup of all config, keys and definitions — restore on another server. |
 | **Self-update** | Update from GitHub while preserving all configuration. |
+
+---
+
+## 🔌 Protocols
+
+All are selectable per-tunnel. For carrying **xray/Reality across DPI**, the
+proven performers are the multiplexed-TLS **TCP** transports — **BackPack
+(wssmux)** and **GOST (mtls)** — because plain-TCP relays get DPI-reset and
+**UDP is blocked on some foreign providers** (see the note on Hysteria).
+
+| Protocol | Layer / transport | Mux / TLS | Best for |
+|----------|-------------------|-----------|----------|
+| **GRE** | kernel L3 (proto 47) | — | Fastest, lowest overhead; needs `ip_gre` (KVM/dedicated, not OpenVZ/LXC) and GRE allowed. |
+| **Paqet** | userspace KCP over raw socket | encrypted | DPI-resistant point-to-point; port-forward or SOCKS5. |
+| **Backhaul** | userspace TCP reverse tunnel | tcpmux/wsmux | NAT/firewall traversal, port forwarding. |
+| **BackPack** | userspace TCP reverse tunnel | **wss/wssmux + TLS** | ✅ **Top pick for xray over DPI** — persistent multiplexed TLS websocket. |
+| **Rathole** | userspace TCP reverse tunnel | TLS/noise | Lightweight, high-performance reverse forwarding. |
+| **GOST** | userspace relay | **mtls/mwss/grpc/wss** | ✅ Proven xray carrier (mtls); very versatile relay chains. |
+| **FRP** | userspace reverse proxy | tcpmux/TLS | Mature reverse-proxy with many features. |
+| **Hysteria 2** | **QUIC / UDP** + TLS + Salamander | Brutal CC | Excellent on lossy links — **but requires the foreign provider to allow inbound UDP.** |
+
+> ⚠️ **Hysteria needs open UDP.** It's QUIC-based; if your foreign provider blocks
+> inbound UDP (test with `tcpdump -ni any udp port <port>`), use a TCP transport
+> such as BackPack (wssmux) or GOST (mtls) instead.
 
 ---
 
@@ -57,7 +81,7 @@ cd tunnel-manager && sudo bash install.sh
 sudo tunnelctl                 # باز کردن منوی مدیریت
 ```
 ۱) از منو **Network optimization → Apply** بزن (روی هر دو سرور).
-۲) **Add tunnel** → پروتکل (GRE یا Paqet) و نقش سرور (ایران/خارج) را انتخاب کن.
+۲) **Add tunnel** → پروتکل را انتخاب کن (برای عبور xray از DPI: **BackPack با wssmux** یا **GOST با mtls**) و نقش سرور (ایران/خارج) را.
 ۳) همان تانل را روی سرور مقابل با نقش برعکس بساز.
 ۴) (اختیاری) **Telegram configuration** برای اعلان و گزارش روزانه.
 
@@ -96,7 +120,7 @@ tunnel-manager/
 ├── tunnelctl              # entry point: menu + scriptable CLI
 ├── install.sh / uninstall.sh / update.sh
 ├── lib/                   # common, ui, validate, config, ipam, state, systemd, deps, menu
-├── drivers/               # driver.sh dispatcher + gre.sh + paqet.sh  (pluggable protocols)
+├── drivers/               # driver.sh dispatcher + gre/paqet/backhaul/backpack/rathole/gost/frp/hysteria (pluggable protocols)
 ├── modules/               # tunnel, optimize, monitor, telegram, report, backup, selfupdate
 ├── systemd/               # tm-monitor / tm-bot / tm-report units + timer
 └── docs/                  # ARCHITECTURE, TELEGRAM, TROUBLESHOOTING
