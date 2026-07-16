@@ -154,7 +154,7 @@ reality_generate_config() {
       "port": ${TUN[RE_PORT]},
       "protocol": "vless",
       "settings": {
-        "clients": [ { "id": "${TUN[RE_UUID]}", "flow": "xtls-rprx-vision" } ],
+        "clients": [ { "id": "${TUN[RE_UUID]}" } ],
         "decryption": "none"
       },
       "streamSettings": {
@@ -198,7 +198,7 @@ JSON
           {
             "address": "${TUN[REMOTE_IP]}",
             "port": ${TUN[RE_PORT]},
-            "users": [ { "id": "${TUN[RE_UUID]}", "flow": "xtls-rprx-vision", "encryption": "none" } ]
+            "users": [ { "id": "${TUN[RE_UUID]}", "encryption": "none" } ]
           }
         ]
       },
@@ -262,7 +262,7 @@ reality_sample() { printf '0 0'; }
 
 reality_status() {
     ui_kv "Role"      "${TUN[RE_ROLE]}"
-    ui_kv "Transport" "VLESS+REALITY+Vision (TCP)"
+    ui_kv "Transport" "VLESS+REALITY (TCP)"
     ui_kv "SNI"       "${TUN[RE_SNI]}"
     if [[ "${TUN[RE_ROLE]}" == server ]]; then
         ui_kv "Listen"  "0.0.0.0:${TUN[RE_PORT]}"
