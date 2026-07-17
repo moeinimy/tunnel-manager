@@ -152,6 +152,19 @@ optimize_nic_revert() {
     rm -f "$TM_OPT_NIC_BACKUP"
 }
 
+# tm_aqm_ensure — (re)apply the AQM qdisc + sane queue length to the WAN and to
+# any live tunnel interface. Called on EVERY tunnel start (any protocol), because
+# the queue that hurts is shared: GRE has its own tm* device, while every
+# userspace relay (backhaul/backpack/gost/frp/rathole/paqet/hysteria) egresses via
+# the WAN. Idempotent and cheap, so it also self-heals a box that was optimized by
+# an older version (which left `fq` + a 10000 txqueuelen behind). No-op unless
+# optimization is applied, so `optimize revert` stays honoured.
+tm_aqm_ensure() {
+    [[ -f "$TM_OPT_MARKER" ]] || return 0
+    have tc || return 0
+    optimize_nic_apply "$(_opt_best_qdisc)"
+}
+
 optimize_apply() {
     require_root
     ui_title "Network optimization"

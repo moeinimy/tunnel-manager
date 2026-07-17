@@ -131,13 +131,9 @@ gre_up() {
     ip link set "$dev" up
     ip addr add "${TUN[INNER_LOCAL]}/${TUN[INNER_CIDR]:-30}" dev "$dev"
     [[ -n "${TUN[MTU]:-}" ]] && ip link set "$dev" mtu "${TUN[MTU]}" 2>/dev/null || true
-    # Active queue management on the tunnel itself. Without it the tunnel queue is
-    # a dumb FIFO and latency balloons once the link is busy (bufferbloat).
-    if have tc; then
-        modprobe sch_fq_codel 2>/dev/null || true
-        tc qdisc replace dev "$dev" root fq_codel 2>/dev/null || true
-        ip link set dev "$dev" txqueuelen 1000 2>/dev/null || true
-    fi
+    # AQM for this tm* device is applied centrally by tm_aqm_ensure (called from
+    # tunnel_up_hook right after this), so it picks cake/fq_codel consistently
+    # with the WAN instead of hard-coding one here.
     gre_rules_up
     log_ok "GRE tunnel '${TUN[NAME]}' up on $dev (${TUN[INNER_LOCAL]} <-> ${TUN[INNER_REMOTE]})"
 }
