@@ -19,7 +19,13 @@ gre_wizard() {
     local def_local; def_local="$(detect_local_ip)"
     ask_valid TUN[LOCAL_IP]  "This server's public IP" is_ipv4 "$def_local"
     ask_valid TUN[REMOTE_IP] "Peer (remote) public IP"  is_ipv4
-    ask_valid TUN[MTU]       "Tunnel MTU"               is_mtu 1400
+    # 1476 = 1500 - 24 bytes of GRE header: the correct value for GRE over normal
+    # Ethernet, and what the widely-used simple Iran GRE scripts leave as default.
+    # A lower MTU (we used to default to 1400) is not "safer" here — it just makes
+    # ~5% more packets for the same data, and on a relay whose bottleneck is
+    # softirq CPU, packet COUNT is what costs. Lower it only if the underlying path
+    # really has a smaller MTU.
+    ask_valid TUN[MTU]       "Tunnel MTU (1476 = 1500 - GRE header)" is_mtu 1476
 
     local idx; idx="$(ipam_alloc "${TUN[NAME]}")"
     TUN[IPAM_INDEX]="$idx"
