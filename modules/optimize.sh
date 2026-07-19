@@ -347,6 +347,18 @@ EOF
         log_warn "Some sysctl keys were rejected by this kernel (applied the rest)."
     fi
 
+    # Shaping is a HARD CEILING on throughput — worth saying out loud, because it
+    # is easy to set it low while chasing latency and then wonder where the speed
+    # went. Only useful when the bottleneck queue is upstream of this box.
+    if [[ -n "${TM_TUNNEL_SHAPE_MBIT:-}${TM_SHAPE_MBIT:-}" ]]; then
+        log_warn "Shaping is ON — throughput is capped at ${TM_TUNNEL_SHAPE_MBIT:-${TM_SHAPE_MBIT}} mbit."
+        log_warn "  Remove TM_TUNNEL_SHAPE_MBIT / TM_SHAPE_MBIT from $TM_SETTINGS_FILE to uncap."
+    fi
+    if [[ "$cc" == bbr ]]; then
+        log_ok "Congestion control: BBR — the right choice on a lossy path (it does"
+        log_ok "  not treat packet loss as congestion the way CUBIC does)."
+    fi
+
     optimize_nic_apply "$qdisc"
     # Spread packet processing across cores — on a single-queue NIC this is often
     # the single biggest latency win, far bigger than any sysctl.
@@ -389,8 +401,9 @@ optimize_status() {
     ui_kv "rmem_max"   "$(sysctl -n net.core.rmem_max 2>/dev/null)"
     ui_kv "backlog"    "$(sysctl -n net.core.netdev_max_backlog 2>/dev/null)"
     ui_kv "conntrack"  "$(sysctl -n net.netfilter.nf_conntrack_max 2>/dev/null || echo n/a)"
-    [[ -n "${TM_SHAPE_MBIT:-}" ]]        && ui_kv "Shaping (WAN)"    "${TM_SHAPE_MBIT} mbit (cake)"
-    [[ -n "${TM_TUNNEL_SHAPE_MBIT:-}" ]] && ui_kv "Shaping (tunnel)" "${TM_TUNNEL_SHAPE_MBIT} mbit (cake)"
+    [[ -n "${TM_SHAPE_MBIT:-}" ]]        && ui_kv "Shaping (WAN)"    "${TM_SHAPE_MBIT} mbit  ⚠ CAPS THROUGHPUT"
+    [[ -n "${TM_TUNNEL_SHAPE_MBIT:-}" ]] && ui_kv "Shaping (tunnel)" "${TM_TUNNEL_SHAPE_MBIT} mbit  ⚠ CAPS THROUGHPUT"
+    [[ -z "${TM_SHAPE_MBIT:-}${TM_TUNNEL_SHAPE_MBIT:-}" ]] && ui_kv "Shaping" "off (uncapped)"
     ui_kv "CPU cores" "$(nproc 2>/dev/null || echo '?')"
     # The live per-interface qdisc + RPS mask are what actually control latency.
     local dev q rps
