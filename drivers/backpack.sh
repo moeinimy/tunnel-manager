@@ -16,13 +16,7 @@
 #
 # TUN keys: BP_ROLE(server|client) BP_TRANSPORT BP_PORT BP_TOKEN REMOTE_IP
 #           LOCAL_IP BP_PORTS(server; ';'-separated "listen=dest") BP_MUX(flag)
-#           BP_HOST(client ws only; CDN domain to dial instead of the IP, optional)
 #           BP_EDGE(client ws only; CDN edge IP, optional)
-#
-# CDN fronting: set BP_HOST to a domain (Arvan/Cloudflare) that resolves to a CDN
-# edge. remote_addr then dials the DOMAIN (so the CDN routes by Host/SNI and the
-# real origin IP is never touched → it stays clean), while REMOTE_IP keeps the
-# origin's real IP for bot/peer control. BP_EDGE optionally pins the edge IP.
 
 # --- Throughput tuning for long, lossy links (override in settings.conf) -----
 # These matter far more than they look. smux gives every multiplexed stream a
@@ -133,19 +127,11 @@ backpack_wizard() {
         log_info "Define which ports users hit here, and where they go on the client side."
         backpack_wizard_ports
     else
-        ask_valid TUN[REMOTE_IP] "Server (other side) REAL public IP (kept for bot/peer control)" is_ipv4
-        # CDN fronting for websocket transports: dial a domain (Arvan/Cloudflare)
-        # instead of the origin IP so the origin never gets dialed directly and
-        # stays clean. Blank = dial the real IP above.
+        ask_valid TUN[REMOTE_IP] "Server (other side) public IP" is_ipv4
+        # Optional CDN edge override for websocket transports (blank = direct).
         case "${TUN[BP_TRANSPORT]}" in
-            ws|wss|wsmux|wssmux)
-                ask TUN[BP_HOST] "CDN domain to dial instead of the IP (e.g. Arvan host; blank = direct to IP)" ""
-                if [[ -n "${TUN[BP_HOST]}" ]] && ! is_host "${TUN[BP_HOST]}"; then
-                    log_warn "'${TUN[BP_HOST]}' is not a valid domain/IP — using the real IP instead."
-                    TUN[BP_HOST]=""
-                fi
-                ask TUN[BP_EDGE] "CDN edge IP to pin (optional, blank = resolve via DNS)" "" ;;
-            *) TUN[BP_HOST]=""; TUN[BP_EDGE]="" ;;
+            ws|wss|wsmux|wssmux) ask TUN[BP_EDGE] "CDN edge IP to dial instead of server (optional, blank = direct)" "" ;;
+            *) TUN[BP_EDGE]="" ;;
         esac
     fi
     backpack_is_mux "${TUN[BP_TRANSPORT]}" && TUN[BP_MUX]=8 || TUN[BP_MUX]=""
@@ -223,10 +209,8 @@ backpack_generate_config() {
         } >"$tmp"
     else
         {
-            # Dial the CDN domain when set (origin IP stays clean); else the IP.
-            local dial="${TUN[BP_HOST]:-${TUN[REMOTE_IP]}}"
             printf '[client]\n'
-            printf 'remote_addr = "%s:%s"\n' "$dial" "${TUN[BP_PORT]}"
+            printf 'remote_addr = "%s:%s"\n' "${TUN[REMOTE_IP]}" "${TUN[BP_PORT]}"
             printf 'transport = "%s"\n' "$transport"
             printf 'token = "%s"\n' "${TUN[BP_TOKEN]}"
             printf 'connection_pool = %s\n' "$TM_BP_POOL"
@@ -298,11 +282,7 @@ backpack_status() {
         ui_kv "Listen"  "0.0.0.0:${TUN[BP_PORT]}   maps: ${TUN[BP_PORTS]}"
         [[ -n "${TUN[REMOTE_IP]:-}" ]] && ui_kv "Peer (bot)" "${TUN[REMOTE_IP]}"
     else
-        if [[ -n "${TUN[BP_HOST]:-}" ]]; then
-            ui_kv "Server"  "${TUN[BP_HOST]}:${TUN[BP_PORT]} (via CDN → real ${TUN[REMOTE_IP]})"
-        else
-            ui_kv "Server"  "${TUN[REMOTE_IP]}:${TUN[BP_PORT]}"
-        fi
+        ui_kv "Server"  "${TUN[REMOTE_IP]}:${TUN[BP_PORT]}"
         [[ -n "${TUN[BP_EDGE]:-}" ]] && ui_kv "Edge IP" "${TUN[BP_EDGE]}"
     fi
     if is_elf "$(backpack_bin)"; then ui_kv "Binary" "$(backpack_bin)"; else ui_kv "Binary" "$(status_dot down) not installed"; fi
