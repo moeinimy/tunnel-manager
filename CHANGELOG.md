@@ -5,6 +5,23 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/).
 
 
+## [3.6.0] - 2026-07-25
+
+### Added
+- **CDN-fronted dialing (Arvan/Cloudflare) for BackPack and Backhaul.** The client
+  side of a websocket tunnel (`ws/wss/wsmux/wssmux`) can now dial a **domain**
+  instead of the origin's IP, so the real origin IP is never contacted directly
+  and stays clean/unfiltered. In the wizard, after the server's real public IP
+  (still kept, so bot/peer control keeps working), a new prompt asks for an
+  optional **CDN domain to dial instead of the IP**. When set, `remote_addr`
+  points at the domain; when blank, behaviour is unchanged (dials the IP).
+  - Use case: put the **foreign** server behind an Arvan domain and let the Iran
+    client reach it through the CDN — the foreign IP never gets dirtied.
+  - `REMOTE_IP` still stores the real origin IP (used only for peer authorisation
+    and firewalling), decoupled from the dial target.
+  - New `is_host` validator (IPv4 **or** DNS name); the domain field is editable
+    later from the bot/edit menu like any other field.
+
 ## [3.0.0] - 2026-07-16
 
 ### Added

@@ -13,6 +13,11 @@
 #
 # TUN keys: BH_ROLE(server|client) BH_TRANSPORT BH_PORT BH_TOKEN REMOTE_IP
 #           LOCAL_IP BH_PORTS(server; ';'-separated "listen=dest") BH_MUX
+#           BH_HOST(client ws only; CDN domain to dial instead of the IP, optional)
+#
+# CDN fronting: set BH_HOST to a domain (Arvan/Cloudflare) that resolves to a CDN
+# edge; remote_addr then dials the DOMAIN so the real origin IP is never touched
+# and stays clean, while REMOTE_IP keeps the origin's real IP for bot/peer control.
 
 # Same bandwidth-delay-product sizing as the BackPack driver: smux caps a stream
 # at window/RTT, and the upstream 64 KiB default means ~5.8 Mbit per stream on a
@@ -84,7 +89,18 @@ backhaul_wizard() {
         log_info "Define which ports users hit here, and where they go on the client side."
         backhaul_wizard_ports
     else
-        ask_valid TUN[REMOTE_IP] "Server (other side) public IP" is_ipv4
+        ask_valid TUN[REMOTE_IP] "Server (other side) REAL public IP (kept for bot/peer control)" is_ipv4
+        # CDN fronting for websocket transports: dial a domain instead of the IP
+        # so the origin stays clean. Blank = dial the real IP above.
+        case "${TUN[BH_TRANSPORT]}" in
+            ws|wsmux)
+                ask TUN[BH_HOST] "CDN domain to dial instead of the IP (e.g. Arvan host; blank = direct to IP)" ""
+                if [[ -n "${TUN[BH_HOST]}" ]] && ! is_host "${TUN[BH_HOST]}"; then
+                    log_warn "'${TUN[BH_HOST]}' is not a valid domain/IP — using the real IP instead."
+                    TUN[BH_HOST]=""
+                fi ;;
+            *) TUN[BH_HOST]="" ;;
+        esac
     fi
     case "${TUN[BH_TRANSPORT]}" in *mux) TUN[BH_MUX]=8 ;; *) TUN[BH_MUX]="" ;; esac
 }
@@ -147,8 +163,10 @@ backhaul_generate_config() {
         } >"$tmp"
     else
         {
+            # Dial the CDN domain when set (origin IP stays clean); else the IP.
+            local dial="${TUN[BH_HOST]:-${TUN[REMOTE_IP]}}"
             printf '[client]\n'
-            printf 'remote_addr = "%s:%s"\n' "${TUN[REMOTE_IP]}" "${TUN[BH_PORT]}"
+            printf 'remote_addr = "%s:%s"\n' "$dial" "${TUN[BH_PORT]}"
             printf 'transport = "%s"\n' "${TUN[BH_TRANSPORT]}"
             printf 'token = "%s"\n' "${TUN[BH_TOKEN]}"
             printf 'connection_pool = %s\n' "$TM_BH_POOL"
@@ -209,6 +227,8 @@ backhaul_status() {
     ui_kv "Transport" "${TUN[BH_TRANSPORT]}"
     if [[ "${TUN[BH_ROLE]}" == server ]]; then
         ui_kv "Listen"  "0.0.0.0:${TUN[BH_PORT]}   maps: ${TUN[BH_PORTS]}"
+    elif [[ -n "${TUN[BH_HOST]:-}" ]]; then
+        ui_kv "Server"  "${TUN[BH_HOST]}:${TUN[BH_PORT]} (via CDN → real ${TUN[REMOTE_IP]})"
     else
         ui_kv "Server"  "${TUN[REMOTE_IP]}:${TUN[BH_PORT]}"
     fi

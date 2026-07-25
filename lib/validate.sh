@@ -25,6 +25,14 @@ is_public_ipv4() {
     return 0
 }
 
+# is_host ADDR — an IPv4 OR a DNS hostname/FQDN. Used for CDN-fronted dial
+# targets (e.g. an Arvan/Cloudflare domain that resolves to an edge, so the real
+# origin IP is never dialed directly and stays clean/unfiltered).
+is_host() {
+    is_ipv4 "$1" && return 0
+    [[ "$1" =~ ^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]
+}
+
 # is_port N — integer in 1..65535.
 is_port() {
     [[ "$1" =~ ^[0-9]+$ ]] || return 1
