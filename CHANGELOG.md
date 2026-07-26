@@ -5,6 +5,19 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/).
 
 
+## [3.6.1] - 2026-07-26
+
+### Fixed
+- **Traffic volume in the bot read about double the real figure.** The counters
+  introduced in 3.5.2 were live, but a relay touches every byte twice — it reads
+  a byte off one socket and writes it to the other — so cgroup accounting logged
+  each upload byte once as ingress and once as egress, and each download byte
+  the same way. Both counters therefore sat at upload+download. The reported
+  total is now exact. The per-direction split remains an estimate, because
+  cgroup accounting cannot distinguish a user socket from a peer socket. GRE is
+  unaffected: it reads netdev counters, which see each packet once.
+
+
 ## [3.6.0] - 2026-07-26
 
 ### Fixed
