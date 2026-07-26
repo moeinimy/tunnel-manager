@@ -5,6 +5,31 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/).
 
 
+## [3.6.0] - 2026-07-26
+
+### Fixed
+- **Large transfers stalled on userspace tunnels while the tunnel looked healthy.**
+  Symptoms: ping and Telegram fine, most sites never load, video buffers a few
+  seconds then waits, and phones are unaffected while PCs are not. The cause is a
+  path-MTU black hole: the inter-server TCP connection carries full-size segments
+  that the path silently drops, and the ICMP "fragmentation needed" replies that
+  would normally shrink them are filtered. Small packets keep flowing, so health
+  checks pass. Phones escape it because carriers hand out a smaller MTU already.
+- Only GRE was protected — it clamps MSS per-device in its own driver. Every
+  userspace protocol (BackPack, Backhaul, GOST, rathole, frp, Paqet, Hysteria)
+  had no MTU handling at all. They now clamp the MSS on the tunnel's own
+  connection, applied centrally from `driver_up`/`driver_down` so it is one
+  implementation rather than seven. `net.ipv4.tcp_mtu_probing` was already on,
+  but it only recovers *after* a connection has stalled — which is exactly the
+  "loads a little, then waits" behaviour; clamping avoids the stall instead.
+- The rule is scoped to the tunnel's own port, so nothing else on the server is
+  affected, and it is added and removed symmetrically with the tunnel. The port
+  is discovered generically but anchored so a local-only listener
+  (`PAQET_SOCKS_PORT`) can never be clamped by mistake.
+- Clamp value is configurable via `TM_TUNNEL_MSS` in `settings.conf`
+  (default 1360).
+
+
 ## [3.5.2] - 2026-07-26
 
 ### Fixed
