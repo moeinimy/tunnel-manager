@@ -5,6 +5,34 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/).
 
 
+## [3.9.4] - 2026-08-24
+
+### Fixed
+- **Throughput decayed over days until something was restarted.** The managed
+  sysctl file set a 64 MiB ceiling on `tcp_rmem`/`tcp_wmem`. Autotuning climbs to
+  whatever ceiling it is given, and a tunnel's connections live for days, so it
+  got there: measured on an 85 ms path, receive buffers had reached 67 MB and
+  send buffers 37 MB, `minrtt` held at 73-91 ms while `rcv_rtt` reached 514 ms,
+  and BBR's bandwidth estimate had fallen from tens of Mbit to 250-700 kbit per
+  connection. The inner streams then retransmitted data that had merely arrived
+  late — 300-460 DSACK dups per connection — which is TCP-over-TCP collapse in
+  its textbook form.
+
+  The delay was not on the wire. It was queue standing in a buffer sized about
+  thirty times the path's bandwidth-delay product, and `fq_codel` could not touch
+  it: the queue is in the socket buffer, a layer above the qdisc. That is why AQM
+  on these boxes never helped, and why restarting the tunnel always did — fresh
+  sockets start small again.
+
+  The ceiling is now 4 MiB, roughly twice the BDP of a 200 Mbit, 85 ms path, and
+  overridable as `TM_TCP_BUF_MAX` in settings.conf for a genuinely fatter path.
+  The `net.core.*_max` ceilings are deliberately unchanged: they cap only an
+  explicit `setsockopt`, which nothing in the forwarding path issues.
+
+  Run `tunnelctl optimize apply` after updating to rewrite the sysctl file, then
+  restart the tunnel so its existing connections are rebuilt at the new ceiling.
+
+
 ## [3.6.1] - 2026-07-26
 
 ### Fixed
