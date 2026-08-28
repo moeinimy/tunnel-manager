@@ -27,7 +27,8 @@ for _f in \
     drivers/driver.sh drivers/gre.sh drivers/paqet.sh drivers/backhaul.sh drivers/backpack.sh drivers/rathole.sh drivers/gost.sh drivers/frp.sh drivers/hysteria.sh \
     modules/telegram.sh modules/tunnel.sh modules/optimize.sh \
     modules/monitor.sh modules/report.sh modules/backup.sh modules/selfupdate.sh \
-    modules/peer.sh lib/menu.sh ; do
+    modules/peer.sh modules/api.sh modules/schema.sh modules/prepare.sh \
+    modules/backupfull.sh modules/nodeagent.sh lib/menu.sh ; do
     . "$TM_HOME/$_f"
 done
 
@@ -42,6 +43,8 @@ ${C_BOLD}Usage:${C_RESET} tunnelctl [command] [args]
 ${C_BOLD}Commands:${C_RESET}
   (no args)              open the interactive menu
   add                    add a new tunnel (wizard)
+  create KEY=VALUE...    add a tunnel non-interactively (used by the web panel)
+  json <sub> [args]      machine-readable output (list|tunnel|protocols|fields|meta)
   remove [name]          remove a tunnel
   edit [name]            edit a tunnel (interactive)
   set <name> <KEY> <VAL> change one field non-interactively (scriptable/remote)
@@ -59,6 +62,7 @@ ${C_BOLD}Commands:${C_RESET}
   restore [file]         restore configuration from a backup
   report [daily|weekly|monthly] [--send]
   update                 update from GitHub (keeps config)
+  regen                  rewrite every tunnel config from current defaults
   uninstall              remove everything (reverts optimization)
   version                print version
   help                   this message
@@ -74,6 +78,8 @@ main() {
     case "$cmd" in
         menu|"")        menu_main ;;
         add)            tunnel_add ;;
+        create)         require_root; tunnel_add_kv "$@" ;;
+        json)           api_dispatch "$@" ;;
         remove|rm|del)  tunnel_remove "${1:-}" ;;
         edit)           tunnel_edit "${1:-}" ;;
         set)            tunnel_set "${1:-}" "${2:-}" "${3:-}" ;;
@@ -114,10 +120,13 @@ main() {
                 *)      backup_create ;;
             esac ;;
         restore)        backup_restore "${1:-}" ;;
+        backup-full)    require_root; backup_full "${1:-}" ;;
+        restore-full)   require_root; restore_full "${1:-}" ;;
         report)
             local period="daily"; [[ "${1:-}" =~ ^(daily|weekly|monthly)$ ]] && { period="$1"; shift; }
             if [[ "${1:-}" == --send ]]; then report_send "$period"; else report_show "$period"; fi ;;
         update)         selfupdate_run ;;
+        regen)          require_root; tunnel_regen_all ;;
         uninstall)      require_root; bash "$TM_HOME/uninstall.sh" ;;
         version|-v|--version) version ;;
         help|-h|--help) usage ;;
@@ -127,6 +136,7 @@ main() {
         monitor-run)    require_root; monitor_run ;;
         bot-run)        require_root; tg_bot_run ;;
         agent-serve)    agent_serve ;;
+        node-agent)     node_agent_run ;;
         *)              log_error "Unknown command: $cmd"; usage; exit 1 ;;
     esac
 }
