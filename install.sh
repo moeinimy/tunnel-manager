@@ -18,17 +18,38 @@ _src="${BASH_SOURCE[0]}"
 SRC_DIR="$(cd -P "$(dirname "$_src")" >/dev/null 2>&1 && pwd)"
 
 if [[ ! -f "$SRC_DIR/tunnelctl" ]]; then
-    : "${TM_REPO:=moeinimy/tunnel-manager}"
+    : "${TM_REPO:=moeinimy/moeinimy-tunnel-ui}"
     : "${TM_BRANCH:=main}"
     echo "Fetching Tunnel Manager source from $TM_REPO ($TM_BRANCH)…"
     _tmp="$(mktemp -d)"
-    if ! curl -fsSL --max-time 120 -o "$_tmp/src.tar.gz" \
-        "https://github.com/${TM_REPO}/archive/refs/heads/${TM_BRANCH}.tar.gz"; then
-        echo "ERROR: could not download source. Set TM_REPO to your repository." >&2
+    # Same reasoning as tm_fetch in lib/common.sh, inline because the bootstrap is
+    # what fetches that library. No flat deadline: give up on a transfer that has
+    # STALLED, not on one that is merely slow. A throttled link measured at 23 KB/s
+    # needs about four minutes for this archive, so the old 120s cap meant such a
+    # node could never install or update at all — it failed at the same 2.7 MB every
+    # time, however often it was retried.
+    _url="https://github.com/${TM_REPO}/archive/refs/heads/${TM_BRANCH}.tar.gz"
+    _ok=0
+    for _pfx in "" ${TM_DOWNLOAD_MIRRORS:-}; do
+        if curl -fL --connect-timeout 15 --speed-limit 2048 --speed-time 60 \
+            --retry 3 --retry-delay 5 -o "$_tmp/src.tar.gz" "${_pfx}${_url}"; then
+            _ok=1; break
+        fi
+        [[ -n "$_pfx" ]] && echo "mirror failed: ${_pfx}${_url}" >&2
+    done
+    if [[ "$_ok" -ne 1 ]]; then
+        echo "ERROR: could not download source. On a throttled link set TM_DOWNLOAD_MIRRORS in /etc/tunnel-manager/settings.conf to a reachable URL prefix, or check TM_REPO." >&2
         exit 1
     fi
     tar -xzf "$_tmp/src.tar.gz" -C "$_tmp"
-    SRC_DIR="$(find "$_tmp" -maxdepth 1 -type d -name '*-*' | head -1)"
+    _root="$(find "$_tmp" -maxdepth 1 -type d -name '*-*' | head -1)"
+    # The backend now lives in the panel monorepo under tunnel/; fall back to the
+    # archive root so a standalone tunnel-manager checkout still installs.
+    if [[ -f "$_root/tunnel/tunnelctl" ]]; then
+        SRC_DIR="$_root/tunnel"
+    else
+        SRC_DIR="$_root"
+    fi
     exec bash "$SRC_DIR/install.sh" "$@"
 fi
 
@@ -73,6 +94,9 @@ ln -sf "$INSTALL_DIR/tunnelctl" "$BIN_LINK"
 # extraction dir and break on the next restart.
 TM_HOME="$INSTALL_DIR"; export TM_HOME
 unset TM_BIN_DIR
+# lib/ui.sh is needed even though the installer prints no menus: optimize_apply
+# (run below) calls ui_title/ui_kv, which otherwise fail with
+# "ui_title: command not found" mid-install.
 for _lib in lib/common.sh lib/validate.sh lib/ui.sh lib/config.sh lib/ipam.sh \
             lib/systemd.sh drivers/driver.sh drivers/gre.sh drivers/paqet.sh \
             drivers/backhaul.sh drivers/backpack.sh drivers/rathole.sh drivers/gost.sh drivers/frp.sh drivers/hysteria.sh \
@@ -86,7 +110,7 @@ ensure_dirs
 if [[ ! -f "$TM_SETTINGS_FILE" ]]; then
     cat >"$TM_SETTINGS_FILE" <<EOF
 # Tunnel Manager settings — edit and restart services to apply.
-TM_REPO=${TM_REPO:-moeinimy/tunnel-manager}
+TM_REPO=${TM_REPO:-moeinimy/moeinimy-tunnel-ui}
 TM_BRANCH=main
 
 # Paqet binary source (see docs if downloads fail)
@@ -105,6 +129,15 @@ TM_DISK_ALERT=90
 EOF
     chmod 600 "$TM_SETTINGS_FILE"
     log_ok "Wrote default settings to $TM_SETTINGS_FILE"
+else
+    # Migration: settings.conf is written once and never overwritten, so an install
+    # from before the panel merge still pins the standalone tunnel-manager repo.
+    # Left alone, `tunnelctl update` would pull that repo and DOWNGRADE the backend
+    # (no api.sh/prepare.sh/nodeagent.sh), silently breaking the panel integration.
+    if grep -q '^TM_REPO=moeinimy/tunnel-manager[[:space:]]*$' "$TM_SETTINGS_FILE" 2>/dev/null; then
+        sed -i 's|^TM_REPO=moeinimy/tunnel-manager[[:space:]]*$|TM_REPO=moeinimy/moeinimy-tunnel-ui|' "$TM_SETTINGS_FILE"
+        log_ok "Migrated TM_REPO in $TM_SETTINGS_FILE to the panel monorepo."
+    fi
 fi
 
 # --- Infra systemd units ----------------------------------------------------
@@ -125,6 +158,10 @@ agent_firewall ensure 2>/dev/null || true
 # takes effect immediately. try-restart only acts if the unit is running.
 systemctl try-restart tm-monitor.service >/dev/null 2>&1 || true
 systemctl try-restart tm-bot.service     >/dev/null 2>&1 || true
+# The Iran node's control agent too: without this, `tunnelctl update` on a node
+# swaps the code underneath a long-running agent that keeps executing the OLD
+# copy (and its cached token) until someone restarts it by hand.
+systemctl try-restart tm-node-agent.service >/dev/null 2>&1 || true
 # Start the bot only if Telegram is already configured.
 if [[ -f "$TM_TELEGRAM_FILE" ]] && grep -q '^TG_ENABLED=yes' "$TM_TELEGRAM_FILE" 2>/dev/null; then
     systemctl enable --now tm-bot.service >/dev/null 2>&1 || true
